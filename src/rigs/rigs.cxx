@@ -102,6 +102,7 @@ RIG_K4			rig_K4;
 RIG_PCR1000		rig_PCR1000;
 RIG_RAY152		rig_RAY152;
 RIG_TMD710		rig_TMD710;
+RIG_TRXAVR		rig_TRXAVR;
 RIG_TS140		rig_TS140;
 RIG_TS440		rig_TS440;
 RIG_TS450S		rig_TS450S;
@@ -216,46 +217,47 @@ rigbase *rigs[] = {
 	&rig_PCR1000,	// 69
 	&rig_RAY152,	// 70
 	&rig_TMD710,	// 71
-	&rig_TS140,		// 72
-	&rig_TS440,		// 73
-	&rig_TS450S,	// 74
-	&rig_TS480HX,	// 75
-	&rig_TS480SAT,	// 76
-	&rig_TS570,		// 77
-	&rig_TS590S,	// 78
-	&rig_TS590SG,	// 79
-	&rig_TS790,		// 80
-	&rig_TS850,		// 81
-	&rig_TS870S,	// 82
-	&rig_TS890S,	// 83
-	&rig_TS940S,	// 84
-	&rig_TS950,		// 85
-	&rig_TS990,		// 86
-	&rig_TS2000,	// 87
-	&rig_TT516,		// 88
-	&rig_TT535,		// 89
-	&rig_TT538,		// 90
-	&rig_TT550,		// 91
-	&rig_TT563,		// 92
-	&rig_TT566,		// 93
-	&rig_TT588,		// 94
-	&rig_TT599,		// 95
-	&rig_AOR5K,		// 96
-	&rig_XI5105,	// 97
-	&rig_XIG90,		// 98
-	&rig_X6100,		// 99
-	&rig_PowerSDR,	// 100
-	&rig_FLEX1500,	// 101
-	&rig_TX500,		// 102
-	&rig_QCXP,		// 103
-	&rig_qdx,		// 104
-	&rig_qmx,		// 105
-	&rig_sdr2,		// 106
-	&rig_tci_sundx,	// 107
-	&rig_tci_sunpro,// 108
-	&rig_trusdx,	// 109
-	&rig_smartsdr,  // 110
-	&rig_IC7760,	// 111
+	&rig_TRXAVR,	// 72
+	&rig_TS140,		// 73
+	&rig_TS440,		// 74
+	&rig_TS450S,	// 75
+	&rig_TS480HX,	// 76
+	&rig_TS480SAT,	// 77
+	&rig_TS570,		// 78
+	&rig_TS590S,	// 79
+	&rig_TS590SG,	// 80
+	&rig_TS790,		// 81
+	&rig_TS850,		// 82
+	&rig_TS870S,	// 83
+	&rig_TS890S,	// 84
+	&rig_TS940S,	// 85
+	&rig_TS950,		// 86
+	&rig_TS990,		// 87
+	&rig_TS2000,	// 88
+	&rig_TT516,		// 89
+	&rig_TT535,		// 90
+	&rig_TT538,		// 91
+	&rig_TT550,		// 92
+	&rig_TT563,		// 93
+	&rig_TT566,		// 94
+	&rig_TT588,		// 95
+	&rig_TT599,		// 96
+	&rig_AOR5K,		// 97
+	&rig_XI5105,	// 98
+	&rig_XIG90,		// 99
+	&rig_X6100,		// 100
+	&rig_PowerSDR,	// 101
+	&rig_FLEX1500,	// 103
+	&rig_TX500,		// 104
+	&rig_QCXP,		// 105
+	&rig_qdx,		// 106
+	&rig_qmx,		// 107
+	&rig_sdr2,		// 108
+	&rig_tci_sundx,	// 109
+	&rig_tci_sunpro,// 110
+	&rig_trusdx,	// 101
+	&rig_smartsdr,  // 111
+	&rig_IC7760,	// 112
 	NULL
 
 };

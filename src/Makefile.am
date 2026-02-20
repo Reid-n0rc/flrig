@@ -155,6 +155,7 @@ flrig_SOURCES += \
 	rigs/icom/IC7700.cxx \
 	rigs/icom/ICF8101.cxx \
 	rigs/icom/ICR71.cxx \
+        rigs/kenwood/TrxAVR.cxx \
 	rigs/kenwood/KENWOOD.cxx \
 	rigs/kenwood/TS140.cxx \
 	rigs/kenwood/TS440.cxx \
@@ -338,6 +339,7 @@ EXTRA_DIST = \
 	include/font_browser.h \
 	include/flrigrc.h \
 	include/icons.h \
+        include/kenwood/TrxAVR.h \
 	include/kenwood/KENWOOD.h \
 	include/pixmaps.h \
 	include/Fl_SigBar.h \
