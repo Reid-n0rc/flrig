@@ -584,15 +584,23 @@ void RIG_TS870S::tune_rig(int dummy)
 // the TS-870 actually has 4 attenuator settings.
 // RA00; = Off,  RA01; = 6dB,  RA02; = 12dB,  RA03; = 18dB      wbx
 
-// It would be nice to have right-click to cycle the other way. wbx3
-
 int  RIG_TS870S::next_attenuator()
 {
-	switch (atten_state) {
-		case 0: return 1;
-		case 1: return 2;
-		case 2: return 3;
-		case 3: return 0;
+	if (Fl::event_button() == FL_RIGHT_MOUSE) {
+		switch (atten_state) { // Reduce Attenuator value
+			case 0: return 3;
+			case 1: return 0;
+			case 2: return 1;
+			case 3: return 2;
+		}
+	}
+	else { // Mouse Left Click
+		switch (atten_state) { // Increase Attenuator value
+			case 0: return 1;
+			case 1: return 2;
+			case 2: return 3;
+			case 3: return 0;
+		}
 	}
 	return 0;
 }
@@ -1691,33 +1699,10 @@ int  RIG_TS870S::get_auto_notch()
 	return anotch;
 }
 
-
-// revert to use KENWOOD generic get set for split operation
-/*
-//----------------------------------------------------------------------
-// revision is similar to TS950S code
-//----------------------------------------------------------------------
 void RIG_TS870S::set_split(bool val)
 {
-// find out which VFO (or if Memory) is in use for RX.
-
-	cmd = "FR;";   sendCommand(cmd);
-	showresp(WARN, ASC, "RX-VFO?", cmd, "");
-	if (wait_char(';', 4, 100, "get VFO for split", ASC) < 4) return;
-
-	size_t p = replystr.rfind("FR");
-// if bad data, change nothing.
-	if (p == std::string::npos) return;
-
-// '0' = VFO-A, '1' = VFO-B, '2' = Memory.
-	switch (replystr[p+2]) {
-		case '0' : inuse = onA; break;
-		case '1' : inuse = onB; break;
-		case '2' :
-		default  : return;  // do nothing the xcvr is in memory mode
-	}
-
 	split = val;
+
 	if (inuse == onB) {
 		if (val) {
 			cmd = "FR1;FT0;";
@@ -1739,39 +1724,33 @@ void RIG_TS870S::set_split(bool val)
 			showresp(WARN, ASC, "Rx on A, Tx on A", cmd, "");
 		}
 	}
-	Fl::awake(highlight_vfo, (void *)0);
 }
 
-//----------------------------------------------------------------------
-// This works for the 950S ... you can can revert to use your
-//  IF byte 32 test if this does not work on the 870S
-//----------------------------------------------------------------------
 int RIG_TS870S::get_split()
 {
-	size_t p;
-	int split = 0;
 	char rx = 0, tx = 0;
+
 // tx vfo
-	cmd = rsp = "FT";
-	cmd.append(";");
-	if (wait_char(';', 4, 100, "get split tx vfo", ASC) == 4) {
-		p = replystr.rfind(rsp);
-		if (p == std::string::npos) return split;
-		tx = replystr[p+2];
-	}
+	cmd = "FT;";
+	get_trace(1, "get TX vfo");
+	int ret = wait_char(';', 4, 100, "get tx vfo", ASC);
+	gett("");
+	if (ret == 4)
+		sscanf(replystr.c_str(), "FT%c;", &tx);
+
 // rx vfo
-	cmd = rsp = "FR";
-	cmd.append(";");
-	if (wait_char(';', 4, 100, "get split rx vfo", ASC) == 4) {
-		p = replystr.rfind(rsp);
-		if (p == std::string::npos) return split;
-		rx = replystr[p+2];
+	cmd = "FR;";
+	get_trace(1, "get RX vfo");
+	ret = wait_char(';', 4, 100, "get split rx vfo", ASC);
+	gett("");
+	if (ret == 4)
+		sscanf(replystr.c_str(), "FR%c;", &rx);
+
 // split test
-        if (tx != rx) split = 1; // change submitted by G8KBV
-	}
-	return split;
+	if (tx != rx) return 1;
+
+	return 0;
 }
-*/
 
 //----------------------------------------------------------------------
 // Squelch commands (G0WBX) With lots of assistance from W1HKJ!

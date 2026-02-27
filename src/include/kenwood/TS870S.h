@@ -78,6 +78,9 @@ public:
 	bool can_split() { return true;}
 	bool twovfos() {return true;}
 
+	int  get_split();
+	void set_split(bool);
+
 	int  get_smeter();
 //	int  get_swr();
 	int  get_power_out();
