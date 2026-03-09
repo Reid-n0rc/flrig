@@ -1770,7 +1770,7 @@ int  RIG_FT991A::get_agc()
 		case '1': agcval = 1; break;
 		case '2': agcval = 2; break;
 		case '3': agcval = 3; break;
-		case '4': case 5:
+		case '4': case '5':
 		case '6': agcval = 4; break;
 	}
 	return agcval;
