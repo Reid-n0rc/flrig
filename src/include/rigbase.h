@@ -321,6 +321,7 @@ public:
 	bool has_cw_vol;
 	bool has_cw_spot;
 	bool has_cw_spot_tone;
+	bool has_cw_zero_in;
 	bool has_cw_qsk;
 	bool has_cw_break_in;
 	bool has_cw_delay;
@@ -737,6 +738,8 @@ double vfo_;
 		min = 300; max = 1050; step = 50; } // default for FT950/FT450D
 	virtual void get_cw_spot_tone_min_max_step(double &min, double &max, double &step) {
 		min = 300; max = 1050; step = 50; } // default for FT950/FT450D
+
+	virtual void zero_in() {}
 
 	virtual void set_vox_onoff() {}
 	virtual void set_vox_gain() {}

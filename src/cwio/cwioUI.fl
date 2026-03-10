@@ -48,21 +48,21 @@ Function {new_cwio_dialog()} {open
       code3 {o->setFontColor(progStatus.cw_sent_font_color);}
       class FTextView
     }
-    Fl_Input txt_to_send {selected
+    Fl_Input txt_to_send {
+      callback {control_function_keys();}
       xywh {2 94 668 50} color 15 align 16 when 1 textfont 13 textsize 16
       code0 {o->color(progStatus.txt_to_send_bkgnd_color);}
       code1 {o->textfont(progStatus.txt_to_send_font); o->textsize(progStatus.txt_to_send_size);}
       code2 {o->setFontColor(progStatus.txt_to_send_font_color);}
-      callback {control_function_keys();}
       class FTextEdit
     }
     Fl_Group {} {open
-      xywh {0 147 670 56}
+      xywh {0 144 670 56}
     } {
       Fl_Value_Slider sldr_cwioWPM {
         label WPM
         callback {progStatus.cwioWPM = (int)o->value();}
-        tooltip {My transmit CW WPM} xywh {4 149 240 20} type {Horz Knob} align 8 minimum 5 maximum 100 step 1 value 20 textsize 14
+        tooltip {My transmit CW WPM} xywh {4 146 155 20} type {Horz Knob} align 8 minimum 5 maximum 100 step 1 value 20 textsize 14
         code0 {\#include "flslider2.h"}
         code1 {o->value(progStatus.cwioWPM);}
         class Fl_Value_Slider2
@@ -70,7 +70,12 @@ Function {new_cwio_dialog()} {open
       Fl_Button btn_cwio_config {
         label Config
         callback {open_cwio_config();}
-        tooltip {Configure cwio} xywh {374 148 60 22}
+        tooltip {Configure cwio} xywh {215 145 60 22}
+      }
+      Fl_Button btn_view_cwlog {
+        label {View Log}
+        callback {cwlog_view();}
+        tooltip {View cwlogbook} xywh {279 145 75 22}
       }
       Fl_Button btn_cwio_clear {
         label Clear
@@ -79,108 +84,108 @@ Function {new_cwio_dialog()} {open
 else
   cwio_clear_text();}
         tooltip {Clear PENDING text
-Shift - Clear SENT text} xywh {439 148 60 22}
+Shift - Clear SENT text} xywh {358 145 60 22}
+      }
+      Fl_Button btn_cwio_zin {
+        label {Zero In}
+        callback {CW_Zero();}
+        tooltip {View cwlogbook} xywh {422 145 75 22}
       }
       Fl_Light_Button btn_cwioKEY {
         label KEY
         callback {cwio_key (o->value());
 if (o->value()) cwio_process = KEYDOWN;
 else            cwio_process = NONE;}
-        tooltip {Key Down / Up} xywh {503 148 50 22}
+        tooltip {Key Down / Up} xywh {503 145 50 22}
       }
       Fl_Light_Button btn_cwioSEND {
         label {Send/Pause}
         callback {send_text(o->value());}
-        tooltip {Send / Pause sending characters} xywh {557 148 105 22}
+        tooltip {Send / Pause sending characters} xywh {557 145 105 22}
       }
       Fl_Group {} {
-        xywh {2 173 220 30} box ENGRAVED_BOX
+        xywh {2 170 220 30} box ENGRAVED_BOX
       } {
         Fl_Button {btn_msg[0]} {
           label {F 1}
           callback {exec_msg(0);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {5 177 50 22}
+Edit - Control left click} xywh {5 174 50 22}
         }
         Fl_Button {btn_msg[1]} {
           label {F 2}
           callback {exec_msg(1);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {59 177 50 22}
+Edit - Control left click} xywh {59 174 50 22}
         }
         Fl_Button {btn_msg[2]} {
           label {F 3}
           callback {exec_msg(2);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {113 177 50 22}
+Edit - Control left click} xywh {113 174 50 22}
         }
         Fl_Button {btn_msg[3]} {
           label {F 4}
           callback {exec_msg(3);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {168 177 50 22}
+Edit - Control left click} xywh {168 174 50 22}
         }
       }
       Fl_Group {} {
-        xywh {225 173 220 30} box ENGRAVED_BOX
+        xywh {225 170 220 30} box ENGRAVED_BOX
       } {
         Fl_Button {btn_msg[4]} {
           label {F 5}
           callback {exec_msg(4);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {229 177 50 22}
+Edit - Control left click} xywh {229 174 50 22}
         }
         Fl_Button {btn_msg[5]} {
           label {F 6}
           callback {exec_msg(5);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {283 177 50 22}
+Edit - Control left click} xywh {283 174 50 22}
         }
         Fl_Button {btn_msg[6]} {
           label {F 7}
           callback {exec_msg(6);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {337 177 50 22}
+Edit - Control left click} xywh {337 174 50 22}
         }
         Fl_Button {btn_msg[7]} {
           label {F 8}
           callback {exec_msg(7);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {391 177 50 22}
+Edit - Control left click} xywh {391 174 50 22}
         }
       }
       Fl_Group {} {
-        xywh {448 173 220 30} box ENGRAVED_BOX
+        xywh {448 170 220 30} box ENGRAVED_BOX
       } {
         Fl_Button {btn_msg[8]} {
           label {F 9}
           callback {exec_msg(8);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {451 177 50 22}
+Edit - Control left click} xywh {451 174 50 22}
         }
         Fl_Button {btn_msg[9]} {
           label {F 10}
           callback {exec_msg(9);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {505 177 50 22}
+Edit - Control left click} xywh {505 174 50 22}
         }
         Fl_Button {btn_msg[10]} {
           label {F 11}
           callback {exec_msg(10);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {559 177 50 22}
+Edit - Control left click} xywh {559 174 50 22}
         }
         Fl_Button {btn_msg[11]} {
           label {F 12}
           callback {exec_msg(11);}
           tooltip {Action - Function Key Left click
-Edit - Control left click} xywh {614 177 50 22}
+Edit - Control left click} xywh {614 174 50 22}
         }
-      }
-      Fl_Button btn_view_cwlog {
-        label {View Log}
-        callback {cwlog_view();}
-        tooltip {View cwlogbook} xywh {294 148 75 22}
       }
     }
   }

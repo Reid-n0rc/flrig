@@ -184,6 +184,7 @@ RIG_FTdx1200::RIG_FTdx1200() {
 	has_cw_qsk =
 	has_cw_weight =
 	has_cw_break_in =
+	has_cw_zero_in =
 
 	can_change_alt_vfo =
 	has_smeter =
@@ -1664,5 +1665,10 @@ void RIG_FTdx1200::sync_clock(char *tm)
 	sendCommand(cmd);
 	showresp(WARN, ASC, "sync_time", cmd, replystr);
 	sett("sync_time");
+}
+
+void  RIG_FTdx1200::zero_in()
+{
+	sendCommand("ZI;");
 }
 

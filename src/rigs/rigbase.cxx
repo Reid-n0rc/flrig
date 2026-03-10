@@ -186,6 +186,7 @@ rigbase::rigbase()
 	has_cw_delay =
 	has_cw_weight =
 	has_cw_keyer =
+	has_cw_zero_in =
 	has_vox_onoff =
 	has_vox_gain =
 	has_vox_anti =

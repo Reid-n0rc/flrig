@@ -184,6 +184,7 @@ RIG_FT991A::RIG_FT991A() {
 	has_cw_qsk =
 	has_cw_weight =
 	has_cw_break_in =
+	has_cw_zero_in =
 
 	can_change_alt_vfo =
 	has_smeter =
@@ -1836,5 +1837,10 @@ int  RIG_FT991A::get_squelch()
 		sqval += replystr[p+i] - '0';
 	}
 	return ceil(sqval);
+}
+
+void  RIG_FT991A::zero_in()
+{
+	sendCommand("ZI;");
 }
 

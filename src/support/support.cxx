@@ -4431,6 +4431,12 @@ void cb_cw_spot_tone()
 	selrig->set_cw_spot_tone();
 }
 
+void CW_Zero()
+{
+	guard_lock serial_lock( &mutex_serial, std::string(__func__) );
+	trace(1, "CW_Zero");
+	selrig->zero_in();
+}
 
 void cb_vox_gain()
 {

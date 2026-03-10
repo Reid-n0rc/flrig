@@ -33,6 +33,12 @@ static void cb_btn_cwio_config(Fl_Button*, void*) {
   open_cwio_config();
 }
 
+Fl_Button *btn_view_cwlog=(Fl_Button *)0;
+
+static void cb_btn_view_cwlog(Fl_Button*, void*) {
+  cwlog_view();
+}
+
 Fl_Button *btn_cwio_clear=(Fl_Button *)0;
 
 static void cb_btn_cwio_clear(Fl_Button*, void*) {
@@ -40,6 +46,12 @@ static void cb_btn_cwio_clear(Fl_Button*, void*) {
     cwio_clear_sent_text();
   else
     cwio_clear_text();
+}
+
+Fl_Button *btn_cwio_zin=(Fl_Button *)0;
+
+static void cb_btn_cwio_zin(Fl_Button*, void*) {
+  CW_Zero();
 }
 
 Fl_Light_Button *btn_cwioKEY=(Fl_Light_Button *)0;
@@ -106,12 +118,6 @@ static void cb_btn_msgb(Fl_Button*, void*) {
   exec_msg(11);
 }
 
-Fl_Button *btn_view_cwlog=(Fl_Button *)0;
-
-static void cb_btn_view_cwlog(Fl_Button*, void*) {
-  cwlog_view();
-}
-
 Fl_Double_Window* new_cwio_dialog() {
   Fl_Double_Window* w;
   { Fl_Double_Window* o = new Fl_Double_Window(670, 203, gettext("CW keying"));
@@ -150,8 +156,8 @@ Fl_Double_Window* new_cwio_dialog() {
       o->textfont(progStatus.txt_to_send_font); o->textsize(progStatus.txt_to_send_size);
       o->setFontColor(progStatus.txt_to_send_font_color);
     } // FTextEdit* txt_to_send
-    { Fl_Group* o = new Fl_Group(0, 147, 670, 56);
-      { Fl_Value_Slider2* o = sldr_cwioWPM = new Fl_Value_Slider2(4, 149, 240, 20, gettext("WPM"));
+    { Fl_Group* o = new Fl_Group(0, 144, 670, 56);
+      { Fl_Value_Slider2* o = sldr_cwioWPM = new Fl_Value_Slider2(4, 146, 155, 20, gettext("WPM"));
         sldr_cwioWPM->tooltip(gettext("My transmit CW WPM"));
         sldr_cwioWPM->type(5);
         sldr_cwioWPM->box(FL_DOWN_BOX);
@@ -171,86 +177,90 @@ Fl_Double_Window* new_cwio_dialog() {
         sldr_cwioWPM->when(FL_WHEN_CHANGED);
         o->value(progStatus.cwioWPM);
       } // Fl_Value_Slider2* sldr_cwioWPM
-      { btn_cwio_config = new Fl_Button(374, 148, 60, 22, gettext("Config"));
+      { btn_cwio_config = new Fl_Button(215, 145, 60, 22, gettext("Config"));
         btn_cwio_config->tooltip(gettext("Configure cwio"));
         btn_cwio_config->callback((Fl_Callback*)cb_btn_cwio_config);
       } // Fl_Button* btn_cwio_config
-      { btn_cwio_clear = new Fl_Button(439, 148, 60, 22, gettext("Clear"));
+      { btn_view_cwlog = new Fl_Button(279, 145, 75, 22, gettext("View Log"));
+        btn_view_cwlog->tooltip(gettext("View cwlogbook"));
+        btn_view_cwlog->callback((Fl_Callback*)cb_btn_view_cwlog);
+      } // Fl_Button* btn_view_cwlog
+      { btn_cwio_clear = new Fl_Button(358, 145, 60, 22, gettext("Clear"));
         btn_cwio_clear->tooltip(gettext("Clear PENDING text\nShift - Clear SENT text"));
         btn_cwio_clear->callback((Fl_Callback*)cb_btn_cwio_clear);
       } // Fl_Button* btn_cwio_clear
-      { btn_cwioKEY = new Fl_Light_Button(503, 148, 50, 22, gettext("KEY"));
+      { btn_cwio_zin = new Fl_Button(422, 145, 75, 22, gettext("Zero In"));
+        btn_cwio_zin->tooltip(gettext("View cwlogbook"));
+        btn_cwio_zin->callback((Fl_Callback*)cb_btn_cwio_zin);
+      } // Fl_Button* btn_cwio_zin
+      { btn_cwioKEY = new Fl_Light_Button(503, 145, 50, 22, gettext("KEY"));
         btn_cwioKEY->tooltip(gettext("Key Down / Up"));
         btn_cwioKEY->callback((Fl_Callback*)cb_btn_cwioKEY);
       } // Fl_Light_Button* btn_cwioKEY
-      { btn_cwioSEND = new Fl_Light_Button(557, 148, 105, 22, gettext("Send/Pause"));
+      { btn_cwioSEND = new Fl_Light_Button(557, 145, 105, 22, gettext("Send/Pause"));
         btn_cwioSEND->tooltip(gettext("Send / Pause sending characters"));
         btn_cwioSEND->callback((Fl_Callback*)cb_btn_cwioSEND);
       } // Fl_Light_Button* btn_cwioSEND
-      { Fl_Group* o = new Fl_Group(2, 173, 220, 30);
+      { Fl_Group* o = new Fl_Group(2, 170, 220, 30);
         o->box(FL_ENGRAVED_BOX);
-        { btn_msg[0] = new Fl_Button(5, 177, 50, 22, gettext("F 1"));
+        { btn_msg[0] = new Fl_Button(5, 174, 50, 22, gettext("F 1"));
           btn_msg[0]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[0]->callback((Fl_Callback*)cb_btn_msg);
         } // Fl_Button* btn_msg[0]
-        { btn_msg[1] = new Fl_Button(59, 177, 50, 22, gettext("F 2"));
+        { btn_msg[1] = new Fl_Button(59, 174, 50, 22, gettext("F 2"));
           btn_msg[1]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[1]->callback((Fl_Callback*)cb_btn_msg1);
         } // Fl_Button* btn_msg[1]
-        { btn_msg[2] = new Fl_Button(113, 177, 50, 22, gettext("F 3"));
+        { btn_msg[2] = new Fl_Button(113, 174, 50, 22, gettext("F 3"));
           btn_msg[2]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[2]->callback((Fl_Callback*)cb_btn_msg2);
         } // Fl_Button* btn_msg[2]
-        { btn_msg[3] = new Fl_Button(168, 177, 50, 22, gettext("F 4"));
+        { btn_msg[3] = new Fl_Button(168, 174, 50, 22, gettext("F 4"));
           btn_msg[3]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[3]->callback((Fl_Callback*)cb_btn_msg3);
         } // Fl_Button* btn_msg[3]
         o->end();
       } // Fl_Group* o
-      { Fl_Group* o = new Fl_Group(225, 173, 220, 30);
+      { Fl_Group* o = new Fl_Group(225, 170, 220, 30);
         o->box(FL_ENGRAVED_BOX);
-        { btn_msg[4] = new Fl_Button(229, 177, 50, 22, gettext("F 5"));
+        { btn_msg[4] = new Fl_Button(229, 174, 50, 22, gettext("F 5"));
           btn_msg[4]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[4]->callback((Fl_Callback*)cb_btn_msg4);
         } // Fl_Button* btn_msg[4]
-        { btn_msg[5] = new Fl_Button(283, 177, 50, 22, gettext("F 6"));
+        { btn_msg[5] = new Fl_Button(283, 174, 50, 22, gettext("F 6"));
           btn_msg[5]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[5]->callback((Fl_Callback*)cb_btn_msg5);
         } // Fl_Button* btn_msg[5]
-        { btn_msg[6] = new Fl_Button(337, 177, 50, 22, gettext("F 7"));
+        { btn_msg[6] = new Fl_Button(337, 174, 50, 22, gettext("F 7"));
           btn_msg[6]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[6]->callback((Fl_Callback*)cb_btn_msg6);
         } // Fl_Button* btn_msg[6]
-        { btn_msg[7] = new Fl_Button(391, 177, 50, 22, gettext("F 8"));
+        { btn_msg[7] = new Fl_Button(391, 174, 50, 22, gettext("F 8"));
           btn_msg[7]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[7]->callback((Fl_Callback*)cb_btn_msg7);
         } // Fl_Button* btn_msg[7]
         o->end();
       } // Fl_Group* o
-      { Fl_Group* o = new Fl_Group(448, 173, 220, 30);
+      { Fl_Group* o = new Fl_Group(448, 170, 220, 30);
         o->box(FL_ENGRAVED_BOX);
-        { btn_msg[8] = new Fl_Button(451, 177, 50, 22, gettext("F 9"));
+        { btn_msg[8] = new Fl_Button(451, 174, 50, 22, gettext("F 9"));
           btn_msg[8]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[8]->callback((Fl_Callback*)cb_btn_msg8);
         } // Fl_Button* btn_msg[8]
-        { btn_msg[9] = new Fl_Button(505, 177, 50, 22, gettext("F 10"));
+        { btn_msg[9] = new Fl_Button(505, 174, 50, 22, gettext("F 10"));
           btn_msg[9]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[9]->callback((Fl_Callback*)cb_btn_msg9);
         } // Fl_Button* btn_msg[9]
-        { btn_msg[10] = new Fl_Button(559, 177, 50, 22, gettext("F 11"));
+        { btn_msg[10] = new Fl_Button(559, 174, 50, 22, gettext("F 11"));
           btn_msg[10]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[10]->callback((Fl_Callback*)cb_btn_msga);
         } // Fl_Button* btn_msg[10]
-        { btn_msg[11] = new Fl_Button(614, 177, 50, 22, gettext("F 12"));
+        { btn_msg[11] = new Fl_Button(614, 174, 50, 22, gettext("F 12"));
           btn_msg[11]->tooltip(gettext("Action - Function Key Left click\nEdit - Control left click"));
           btn_msg[11]->callback((Fl_Callback*)cb_btn_msgb);
         } // Fl_Button* btn_msg[11]
         o->end();
       } // Fl_Group* o
-      { btn_view_cwlog = new Fl_Button(294, 148, 75, 22, gettext("View Log"));
-        btn_view_cwlog->tooltip(gettext("View cwlogbook"));
-        btn_view_cwlog->callback((Fl_Callback*)cb_btn_view_cwlog);
-      } // Fl_Button* btn_view_cwlog
       o->end();
     } // Fl_Group* o
     o->end();

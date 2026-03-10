@@ -155,6 +155,8 @@ public:
 	void get_vfoadj_min_max_step(double &min, double &max, double &step);
 
 	void sync_clock(char *tm);
+
+	void zero_in();
 };
 
 

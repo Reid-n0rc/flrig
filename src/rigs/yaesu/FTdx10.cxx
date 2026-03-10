@@ -260,6 +260,8 @@ RIG_FTdx10::RIG_FTdx10() {
 	has_cw_qsk =
 	has_cw_weight =
 	has_cw_break_in =
+	has_cw_zero_in =
+
 	has_split =
 	can_change_alt_vfo =
 	has_smeter =
@@ -1599,5 +1601,10 @@ void RIG_FTdx10::sync_clock(char *tm)
 	sendCommand(cmd);
 	showresp(WARN, ASC, "sync_time", cmd, replystr);
 	sett("sync_time");
+}
+
+void  RIG_FTdx10::zero_in()
+{
+	sendCommand("ZI0;");
 }
 

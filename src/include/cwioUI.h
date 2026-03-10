@@ -17,12 +17,13 @@ extern FTextEdit *txt_to_send;
 extern Fl_Value_Slider2 *sldr_cwioWPM;
 #include <FL/Fl_Button.H>
 extern Fl_Button *btn_cwio_config;
+extern Fl_Button *btn_view_cwlog;
 extern Fl_Button *btn_cwio_clear;
+extern Fl_Button *btn_cwio_zin;
 #include <FL/Fl_Light_Button.H>
 extern Fl_Light_Button *btn_cwioKEY;
 extern Fl_Light_Button *btn_cwioSEND;
 extern Fl_Button *btn_msg[12];
-extern Fl_Button *btn_view_cwlog;
 Fl_Double_Window* new_cwio_dialog();
 #include <FL/Fl_Tabs.H>
 #include <FL/Fl_Box.H>

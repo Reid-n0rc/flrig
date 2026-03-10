@@ -21,6 +21,7 @@
 
 #include "support.h"
 #include "ptt.h"
+#include "cwioUI.h"
 #include "xmlrpc_rig.h"
 
 extern bool testmode;
@@ -826,7 +827,8 @@ void TRACED(init_Generic_Tabs)
 		selrig->has_cw_keyer ||
 		selrig->has_cw_spot ||
 		selrig->has_cw_spot_tone ||
-		selrig->has_cw_vol ) {
+		selrig->has_cw_vol ||
+		selrig->has_cw_zero_in) {
 
 		if (selrig->has_cw_wpm) {
 			int min, max;
@@ -876,6 +878,14 @@ void TRACED(init_Generic_Tabs)
 			selrig->get_cw_spot_tone();
 		} else
 			spnr_cw_spot_tone->hide();
+
+		if (selrig->has_cw_zero_in) {
+			btn_CW_Zero->activate();
+			btn_cwio_zin->activate();
+		} else {
+			btn_CW_Zero->deactivate();
+			btn_cwio_zin->deactivate();
+		}
 
 		if (selrig->has_cw_vol) {
 			spnr_cw_vol->show();

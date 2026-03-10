@@ -190,6 +190,7 @@ public:
 	double getVfoAdj();
 	void get_vfoadj_min_max_step(double &min, double &max, double &step);
 
+	void zero_in();
 };
 
 

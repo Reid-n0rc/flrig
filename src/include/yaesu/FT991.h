@@ -165,6 +165,7 @@ public:
 	void sync_date(char *dt);
 	void sync_clock(char *tm);
 
+	void zero_in();
 };
 
 

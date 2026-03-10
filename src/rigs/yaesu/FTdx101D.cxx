@@ -245,6 +245,7 @@ RIG_FTdx101D::RIG_FTdx101D() {
 	has_cw_qsk =
 	has_cw_weight =
 	has_cw_break_in =
+	has_cw_zero_in =
 
 	has_split_AB =
 
@@ -1560,6 +1561,12 @@ double RIG_FTdx101D::get_idd()
 	double mtr = atoi(&replystr[p+3]);
 	return mtr / 10.0;
 }
+
+void  RIG_FTdx101D::zero_in()
+{
+	sendCommand("ZI;");
+}
+
 
 //======================================================================
 // FTdx101MP

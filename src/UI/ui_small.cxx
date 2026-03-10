@@ -1482,7 +1482,7 @@ Fl_Double_Window *tabs_window()
 			spnr_cw_spot_tone= new Hspinner(
 				spnr_cw_weight->w() + spnr_cw_weight->x() + 4, 32,
 				85, 20, _("Spot tone"), 16);
-			spnr_cw_spot_tone->tooltip(_("Spot volume"));
+			spnr_cw_spot_tone->tooltip(_("Spot tone"));
 			spnr_cw_spot_tone->type(1);
 			spnr_cw_spot_tone->minimum(50);
 			spnr_cw_spot_tone->maximum(1050);
@@ -1492,6 +1492,11 @@ Fl_Double_Window *tabs_window()
 			spnr_cw_spot_tone->value(progStatus.cw_spot);
 			spnr_cw_spot_tone->labelsize(12);
 			spnr_cw_spot_tone->align(FL_ALIGN_BOTTOM | FL_ALIGN_CENTER);
+
+			btn_CW_Zero = new Fl_Button(
+				spnr_cw_spot_tone->x(), spnr_cw_spot_tone->y() + spnr_cw_spot_tone->h() + 16,
+				spnr_cw_spot_tone->w(), 20, _("Zero In"));
+			btn_CW_Zero->callback((Fl_Callback *)cb_CW_Zero);
 
 			spnr_cw_vol= new Hspinner(
 				spnr_cw_spot_tone->w() + spnr_cw_spot_tone->x() + 8, 32,
