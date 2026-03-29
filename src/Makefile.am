@@ -155,7 +155,7 @@ flrig_SOURCES += \
 	rigs/icom/IC7700.cxx \
 	rigs/icom/ICF8101.cxx \
 	rigs/icom/ICR71.cxx \
-        rigs/kenwood/TrxAVR.cxx \
+	rigs/kenwood/TrxAVR.cxx \
 	rigs/kenwood/KENWOOD.cxx \
 	rigs/kenwood/TS140.cxx \
 	rigs/kenwood/TS440.cxx \
@@ -197,6 +197,7 @@ flrig_SOURCES += \
 	rigs/tentec/TT599.cxx \
 	rigs/xiegu/Xiegu-5105.cxx \
 	rigs/xiegu/Xiegu-G90.cxx \
+	rigs/xiegu/G90.v4.cxx \
 	rigs/xiegu/X6100.cxx \
 	rigs/yaesu/FT100D.cxx \
 	rigs/yaesu/FT450.cxx \
@@ -339,7 +340,7 @@ EXTRA_DIST = \
 	include/font_browser.h \
 	include/flrigrc.h \
 	include/icons.h \
-        include/kenwood/TrxAVR.h \
+	include/kenwood/TrxAVR.h \
 	include/kenwood/KENWOOD.h \
 	include/pixmaps.h \
 	include/Fl_SigBar.h \
@@ -455,6 +456,7 @@ EXTRA_DIST = \
 	include/xml_server.h \
 	include/xiegu/Xiegu-5105.h \
 	include/xiegu/Xiegu-G90.h \
+	include/xiegu/G90.v4.h \
 	include/xiegu/X6100.h \
 	include/yaesu/FT100D.h \
 	include/yaesu/FT450.h \
