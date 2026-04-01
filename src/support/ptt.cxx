@@ -108,6 +108,7 @@ void set_gpio_ptt(bool ptt)
 }
 
 #endif //USE_LIBGPIOD
+int CW_ptt = 0;
 
 void rigPTT(bool on)
 {
@@ -122,8 +123,10 @@ void rigPTT(bool on)
 	try {
 		std::string smode = selrig->modes_[vfo->imode];
 
-		if ((smode.find("CW") != std::string::npos) && progStatus.disable_CW_ptt)
+		if ((smode.find("CW") != std::string::npos) && progStatus.disable_CW_ptt) {
+			CW_ptt = on;
 			return;
+		}
 
 		if (smode.find("RTTY") != std::string::npos && on == false)
 			wait_fskPTT();
@@ -150,6 +153,10 @@ void rigPTT(bool on)
 			throw ("No PTT i/o connected");
 	} catch (const std::exception& e) {
 		LOG_DEBUG("%s", e.what());
+		failure_trace(1, e.what());
+	} catch (const char *why) {
+		LOG_DEBUG("%s", why);
+		failure_trace(1, why);
 	}
 }
 
@@ -159,6 +166,12 @@ bool ptt_state()
 {
 	if (progStatus.xmlrpc_rig)
 		return xml_ptt_state();
+
+	std::string smode = selrig->modes_[vfo->imode];
+
+	if ((smode.find("CW") != std::string::npos) && progStatus.disable_CW_ptt) {
+		return CW_ptt;
+	}
 
 	if (progStatus.serial_catptt == PTT_BOTH || progStatus.serial_catptt == PTT_GET)		return selrig->get_PTT();
 	else if (progStatus.serial_dtrptt == PTT_BOTH || progStatus.serial_dtrptt == PTT_GET)	return selrig->get_PTT();

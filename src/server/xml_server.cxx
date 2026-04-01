@@ -302,8 +302,26 @@ class rig_get_ptt : public XmlRpcServerMethod {
 public:
 	rig_get_ptt(XmlRpcServer* s) : XmlRpcServerMethod("rig.get_ptt", s) {}
 
-		void execute(XmlRpcValue& params, XmlRpcValue& result) { 
+	void execute(XmlRpcValue& params, XmlRpcValue& result) { 
 		Fl::awake(connection_ON);
+
+		std::stringstream s;
+		long start = zmsec();
+		s << ztime();
+
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.get_ptt ";
+
+		guard_lock serial(&mutex_serial, "xml get_ptt");
+		s << " @ " << ztime();
+
+		int PTT = selrig->get_PTT();
+
+		s << ztime() << (PTT ? " ON " : " OFF ");
+		s << " [ " << zmsec() - start << " ]";
+		test_trace(1, s.str().c_str());
 
 		result = int(PTT);
 	}
@@ -329,7 +347,7 @@ public:
 		int split_state = selrig->get_split();
 		progStatus.split = split_state;
 		result = split_state;
-xml_trace(2, "rig_get_split ", (split_state ? "ON" : "OFF"));
+		xml_trace(2, "rig_get_split ", (split_state ? "ON" : "OFF"));
 	}
 
 	std::string help() { return std::string("returns state of split"); }
@@ -391,11 +409,24 @@ public:
 			result = "14070000";
 			return;
 		}
-//		int freq;
+
+		std::stringstream s;
+		long start = zmsec();
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.get_vfoA ";
 
 		guard_lock serial(&mutex_serial, "xml get vfoA");
 
+		s << " @ " << ztime();
+
 		vfoA.freq = selrig->get_vfoA();
+
+		s << ": " << vfoA.freq << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
+
 		Fl::awake(setFreqDispA);
 
 		static char szfreq[20];
@@ -424,15 +455,29 @@ public:
 			result = "14070000";
 			return;
 		}
+		std::stringstream s;
+		long start = zmsec();
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.get_vfoB ";
+
 		guard_lock serial(&mutex_serial, "xml get vfoB");
 
+		s << " @ " << ztime();
+
 		vfoB.freq = selrig->get_vfoB();
+
+		s << ": " << vfoA.freq << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
+
 		Fl::awake(setFreqDispB);
 
 		static char szfreq[20];
 		snprintf(szfreq, sizeof(szfreq), "%llu", vfoB.freq);
 		std::string result_string = szfreq;
-xml_trace(2, "rig_get_vfoB", szfreq);
+		xml_trace(2, "rig_get_vfoB", szfreq);
 
 		result = result_string;
 	}
@@ -1012,12 +1057,24 @@ public:
 		int mode;
 
 		try {
-			guard_lock serial_lock(&mutex_serial, "xml rig_get_mode");
+			std::stringstream s;
+			long start = zmsec();
+
+			s << ztime();
+			#ifdef HAS_XMLRPC_CLIENT_ID
+				s << " [" << XmlRpc::client_id << "]";
+			#endif
+			s << " rig.get_modeA ";
+
+			guard_lock serial(&mutex_serial, "xml get modeA");
+			s << " @ " << ztime();
 
 			mode = vfoA.imode;
 
 			std::string result_string = "none";
 			result_string = selrig->modes_.at(mode);
+			s << ": " << result_string << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+			test_trace(1, s.str().c_str());
 			xml_trace(2, "mode A ", result_string.c_str());
 			result = result_string;
 		} catch (const std::exception& e) {
@@ -1050,12 +1107,24 @@ public:
 		int mode;
 
 		try {
-			guard_lock serial_lock(&mutex_serial, "xml rig_get_mode");
+			std::stringstream s;
+			long start = zmsec();
+
+			s << ztime();
+			#ifdef HAS_XMLRPC_CLIENT_ID
+				s << " [" << XmlRpc::client_id << "]";
+			#endif
+			s << " rig.get_modeB ";
+
+			guard_lock serial(&mutex_serial, "xml get modeB");
+			s << " @ " << ztime();
 
 			mode = vfoB.imode;
 
 			std::string result_string = "none";
 			result_string = selrig->modes_.at(mode);
+			s << ": " << result_string << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+			test_trace(1, s.str().c_str());
 			xml_trace(2, "mode B ", result_string.c_str());
 			result = result_string;
 		} catch (const std::exception& e) {
@@ -1646,10 +1715,18 @@ public:
 			return;
 		}
 
+		PTT = int(params[0]);
+
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime() << " rig.set_verify_ptt " << (PTT ? "ON " : "OFF ");
+
 		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
 
-		PTT = int(params[0]);
+		s << " @ " << ztime();
 		xml_trace(1, (PTT ? "rig_set_verify_ptt ON" : "rig_set_verify_ptt OFF"));
+
 		rigPTT(PTT);
 		{
 			bool get = ptt_state();
@@ -1659,14 +1736,16 @@ public:
 				get = ptt_state();
 			}
 			PTT = get;
-			std::stringstream s;
-			s << "ptt returned " << get << " in " << cnt * 10 << " msec";
+
+			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
 			xml_trace(1, s.str().c_str());
+			test_trace(1, s.str().c_str());
+
 			Fl::awake(update_UI_PTT);
 		}
 	}
 
-	std::string help() { return std::string("deprecated; use rig.set_ptt"); }
+	std::string help() { return std::string("set & verify ptt"); }
 
 } rig_set_verify_ptt(&rig_server);
 
@@ -1684,23 +1763,28 @@ public:
 			return;
 		}
 
+		PTT = int(params[0]);
+
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
+
 		guard_lock ser_lock (&mutex_serial, "xml set ptt");
 
-		PTT = int(params[0]);
+		s << " @ " << ztime();
+
 		rigPTT(PTT);
-		{
-			bool get = ptt_state();
-			int cnt = 0;
-			while ((get != PTT) && (cnt++ < 100)) {
-				MilliSleep(10);
-				get = ptt_state();
-			}
-			PTT = get;
-			std::stringstream s;
-			s << " in " << cnt * 10 << " msec";
-			xml_trace(3, "xml set_ptt ", (PTT ? "ON" : "OFF"), s.str().c_str());
-			Fl::awake(update_UI_PTT);
-		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		xml_trace(1, s.str().c_str());
+		test_trace(1, s.str().c_str());
+
+		Fl::awake(update_UI_PTT);
 	}
 
 	std::string help() { return std::string("sets PTT on (1) or off (0), waits for state change"); }
@@ -1719,15 +1803,30 @@ public:
 			return;
 		}
 
-		guard_lock ser_lock (&mutex_serial, "xml set ptt fast");
-
+		std::stringstream s;
+		long start = zmsec();
 		PTT = int(params[0]);
-		xml_trace(2, "xml set_ptt fast ", (PTT ? "ON" : "OFF"));
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_ptt_fast " << (PTT ? "ON " : "OFF ");
+	
+		guard_lock ser_lock (&mutex_serial, "xml set ptt");
+
+		s << " @ " << ztime();
+
 		rigPTT(PTT);
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		xml_trace(1, s.str().c_str());
+		test_trace(1, s.str().c_str());
+
 		Fl::awake(update_UI_PTT);
 	}
 
-	std::string help() { return std::string("set PTT with waiting for state change"); }
+	std::string help() { return std::string("set PTT without waiting for state change"); }
 
 } rig_set_ptt_fast(&rig_server);
 
@@ -1974,7 +2073,17 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>((double)params[0]);
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_vfoA " << freq;
+
 		guard_lock serial(&mutex_serial, "xml set vfoA");
+		s << " @ " << ztime();
 
 		if (!selrig->can_change_alt_vfo  && (selrig->inuse == onB)) {
 			selrig->selectA();
@@ -1985,6 +2094,9 @@ public:
 			vfoA.freq = freq;
 			selrig->set_vfoA(vfoA.freq);
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispA);
 
@@ -2006,7 +2118,17 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_verify_vfoA " << freq;
+
 		guard_lock serial(&mutex_serial, "xml set verify vfoA");
+		s << " @ " << ztime();
 
 		if (!selrig->can_change_alt_vfo  && (selrig->inuse == onB)) {
 			selrig->selectA();
@@ -2017,6 +2139,9 @@ public:
 			selrig->set_vfoA(freq);
 			vfoA.freq = selrig->get_vfoA();
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispA);
 	}
@@ -2037,7 +2162,17 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_verify_vfoA_fast " << freq;
+
 		guard_lock serial(&mutex_serial, "xml set vfoA fast");
+		s << " @ " << ztime();
 
 		if (!selrig->can_change_alt_vfo  && (selrig->inuse == onB)) {
 			selrig->selectA();
@@ -2048,6 +2183,9 @@ public:
 			vfoA.freq = freq;
 			selrig->set_vfoA(vfoA.freq);
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispA);
 	}
@@ -2104,7 +2242,17 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_vfoB " << freq;
+
 		guard_lock serial(&mutex_serial, "xml set vfoB");
+		s << " @ " << ztime();
 
 		if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 			selrig->selectB();
@@ -2115,6 +2263,9 @@ public:
 			selrig->set_vfoB(freq);
 			vfoB.freq = freq;
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispB);
 	}
@@ -2135,7 +2286,17 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_verify_vfoB " << freq;
+
 		guard_lock serial(&mutex_serial, "xml set verify vfoB");
+		s << " @ " << ztime();
 
 		if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 			selrig->selectB();
@@ -2146,6 +2307,9 @@ public:
 			selrig->set_vfoB(freq);
 			vfoB.freq = selrig->get_vfoB();
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispB);
 	}
@@ -2166,7 +2330,17 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_vfoB_fast " << freq;
+
 		guard_lock serial(&mutex_serial, "xml set vfoB fast");
+		s << " @ " << ztime();
 
 		if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 			selrig->selectB();
@@ -2177,6 +2351,9 @@ public:
 			selrig->set_vfoB(freq);
 			vfoB.freq = freq;
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispB);
 	}
@@ -2320,7 +2497,18 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_vfo ";
+
 		guard_lock serial(&mutex_serial, "xml set vfo");
+		s << " @ " << ztime();
+
 		if (selrig->inuse == onB) {
 			selrig->set_vfoB(freq);
 			vfoB.freq = freq;
@@ -2330,6 +2518,9 @@ public:
 			vfoA.freq = freq;
 			Fl::awake(setFreqDispA);
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 	}
 	std::string help() { return std::string("rig.set_vfo NNNNNNNN (Hz)"); }
@@ -2349,7 +2540,18 @@ public:
 		}
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s  << " rig.set_verify_vfo ";
+
 		guard_lock serial(&mutex_serial, "xml set verify vfo");
+		s << " @ " << ztime();
+
 		if (selrig->inuse == onB) {
 			selrig->set_vfoB(freq);
 			vfoB.freq = selrig->get_vfoB();
@@ -2359,6 +2561,9 @@ public:
 			vfoA.freq = selrig->get_vfoA();
 			Fl::awake(setFreqDispA);
 		}
+
+		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		test_trace(1, s.str().c_str());
 
 	}
 	std::string help() { return std::string("rig.set_verify_vfo NNNNNNNN (Hz)"); }
@@ -2409,6 +2614,7 @@ public:
 		unsigned long long freq = static_cast<unsigned long long>(double(params[0]));
 
 		guard_lock serial(&mutex_serial, "xml rig set frequency");
+
 		if (selrig->inuse == onB) {
 			selrig->set_vfoB(freq);
 			vfoB.freq = freq;
@@ -2475,10 +2681,20 @@ public:
 			if (progStatus.reject_xmlrpc_mode)
 				return;
 
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s  << " rig.set_mode ";
+
 		try {
 			for (size_t imode = 0; imode < selrig->modes_.size(); imode++) {
 				if (numode == selrig->modes_.at(imode))  {
-					guard_lock serlock( &mutex_serial, "xml set mode");
+					guard_lock serial(&mutex_serial, "xml set mode");
+					s << " @ " << ztime();
 					if (selrig->inuse == onB) {
 						vfo->imode = vfoB.imode = imode;
 						selrig->set_modeB(imode);
@@ -2490,13 +2706,19 @@ public:
 						vfo->iBW = vfoA.iBW = selrig->def_bandwidth(imode);
 						selrig->set_bwA(vfo->iBW);
 					}
+					s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+					test_trace(1, s.str().c_str());
 					Fl::awake(set_Mode_BW_control);
 					result = 1;
 					return;
 				}
 			}
+s << ", failed @: " << ztime();
+test_trace(1, s.str().c_str());
 			return;
 		} catch (const std::exception& e) {
+s << " ERROR: " << e.what();
+test_trace(1, s.str().c_str());
 			LOG_ERROR("%s", e.what());
 		}
 
@@ -2574,19 +2796,35 @@ public:
 				return;
 
 		std::string numode = (std::string)params[0];
+
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_modeA " << numode;
+
+		guard_lock serial(&mutex_serial, "xml set modeA");
+		s << " @ " << ztime();
+
 		try {
 			for (size_t imode = 0; imode < selrig->modes_.size(); imode++) {
 				if (numode == selrig->modes_.at(imode))  {
-					guard_lock serlock( &mutex_serial, "xml set modeA" );
 					vfo->imode = vfoA.imode = imode;
 					selrig->set_modeA(imode);
 					vfo->iBW = vfoA.iBW = selrig->def_bandwidth(imode);
 					selrig->set_bwA(vfo->iBW);
 					Fl::awake(set_Mode_BW_control);
 					result = 1;
-					return;
+					break;
 				}
 			}
+
+			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+			test_trace(1, s.str().c_str());
+
 			return;
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());
@@ -2657,6 +2895,18 @@ public:
 				return;
 
 		std::string numode = (std::string)params[0];
+		std::stringstream s;
+		long start = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+		s << " rig.set_modeB " << numode;
+
+		guard_lock serial(&mutex_serial, "xml set modeB");
+		s << " @ " << ztime();
+
 		try {
 			for (size_t imode = 0; imode < selrig->modes_.size(); imode++) {
 				if (numode == selrig->modes_.at(imode))  {
@@ -2667,9 +2917,13 @@ public:
 					selrig->set_bwB(vfo->iBW);
 					Fl::awake(set_Mode_BW_control);
 					result = 1;
-					return;
+					break;
 				}
 			}
+
+			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+			test_trace(1, s.str().c_str());
+
 			return;
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());

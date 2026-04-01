@@ -1783,12 +1783,12 @@ void * serial_thread_loop(void *d)
 		}
 
 		if (progStatus.poll_ptt) {
-// guard lock not needed, serial port not accessed
-//			guard_lock lk(&mutex_serial, "ptt");
+			guard_lock lk(&mutex_serial,
+				std::string(__func__).append(" ").append("ptt"));
 			check_ptt();
 		}
 
-		if (PTT || read_tune() ||
+		if (PTT || (!PTT && read_tune()) ||
 			cwio_process == SEND ||
 			cwio_process == CALIBRATE ||
 			cwio_process == KEYDOWN ) {

@@ -71,6 +71,8 @@ extern void tci_trace(int n, ...);
 
 extern bool activate_lock_trace;
 extern void lock_trace(int n, ...); // trace lock/unlock statements
+extern void failure_trace(int n, ...);
+extern void test_trace(int n, ...);
 
 extern void make_trace_window();
 extern void view_trace();

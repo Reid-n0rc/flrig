@@ -335,7 +335,7 @@ void sending_text()
 		c = 0;
 		snd = txt_to_send->buffer()->text();
 		{
-			guard_lock lck(&cwio_text_mutex);
+			guard_lock lck(&cwio_text_mutex, std::string(__func__) );
 			if (!snd.empty()) {
 				c = snd[0];
 				snd.erase(0,1);
@@ -630,7 +630,7 @@ void add_cwio_msg(std::string txt)
 
 void add_cwio(std::string txt)
 {
-	guard_lock lck(&cwio_text_mutex);
+	guard_lock lck(&cwio_text_mutex, std::string(__func__) );
 	new_text = txt_to_send->buffer()->text();
 	new_text.append(txt);
 
@@ -864,7 +864,7 @@ void set_QMX_keyer()
 	char cmd[10];
 	snprintf(cmd, sizeof(cmd), "KS%03d;", progStatus.cwioWPM);
 	{
-		guard_lock serial(&mutex_serial, "cwio_set");
+		guard_lock serial(&mutex_serial, std::string(__func__) );
 		sendCommand(cmd);
 	}
 	QMX_sleep(0.050);
@@ -891,7 +891,7 @@ void QMX_send_char(int c)
 	char cmd[10];
 	snprintf(cmd, sizeof(cmd), "KY %c;", c);
 	{
-		guard_lock serial(&mutex_serial, "cwio_send");
+		guard_lock serial(&mutex_serial, std::string(__func__) );
 		sendCommand(cmd);
 	}
 	QMX_sleep(tc * len);

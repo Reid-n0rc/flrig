@@ -499,7 +499,7 @@ int rigbase::hex2val(std::string hexstr)
 
 int rigbase::waitN(int n, int timeout, const char *sz, int pr)
 {
-	guard_lock reply_lock(&mutex_replystr);
+	guard_lock reply_lock(&mutex_replystr, std::string(__func__) );
 
 	int retnbr = 0;
 
@@ -549,13 +549,15 @@ int rigbase::waitN(int n, int timeout, const char *sz, int pr)
 
 	static char ctrace[1000];
 	memset(ctrace, 0, 1000);
+	int t = zmsec() - tstart;
 	snprintf( ctrace, sizeof(ctrace), "%s: read %d bytes in %d msec, %s",
-		sz, retnbr,
-		(int)(zmsec() - tstart),
+		sz, retnbr, t,
 		(pr == HEX ? str2hex(replystr.c_str(), replystr.length()): replystr.c_str()) );
 
 	if (SERIALDEBUG)
 		ser_trace(1, ctrace);
+
+	if ( t > timeout) failure_trace(1, ctrace);
 
 	return retnbr;
 
@@ -563,7 +565,7 @@ int rigbase::waitN(int n, int timeout, const char *sz, int pr)
 
 int rigbase::wait_char(int ch, int n, int timeout, const char *sz, int pr)
 {
-	guard_lock reply_lock(&mutex_replystr);
+	guard_lock reply_lock(&mutex_replystr, std::string(__func__) );
 
 	std::string wait_str = " ";
 	wait_str[0] = ch;
@@ -637,7 +639,7 @@ int rigbase::wait_char(int ch, int n, int timeout, const char *sz, int pr)
 
 int rigbase::wait_crlf(std::string cmd, std::string sz, int nr, int timeout, int pr)
 {
-	guard_lock reply_lock(&mutex_replystr);
+	guard_lock reply_lock(&mutex_replystr, std::string(__func__) );
 
 	char crlf[3] = "\r\n";
 
@@ -712,7 +714,7 @@ int rigbase::wait_crlf(std::string cmd, std::string sz, int nr, int timeout, int
 
 int rigbase::wait_string(std::string sz, int nr, int timeout, int pr)
 {
-	guard_lock reply_lock(&mutex_replystr);
+	guard_lock reply_lock(&mutex_replystr, std::string(__func__) );
 
 	int retnbr = 0;
 
@@ -781,7 +783,7 @@ int rigbase::wait_string(std::string sz, int nr, int timeout, int pr)
 
 int rigbase::waitfor(int nr, int timeout, int pr)
 {
-	guard_lock reply_lock(&mutex_replystr);
+	guard_lock reply_lock(&mutex_replystr, std::string(__func__) );
 
 	int retnbr = 0;
 
@@ -859,7 +861,7 @@ bool rigbase::id_OK(std::string ID, int wait)
 		return replystr.length();
 	}
 
-	guard_lock reply_lock(&mutex_replystr);
+	guard_lock reply_lock(&mutex_replystr, std::string(__func__) );
 
 	std::string buff;
 	int retn = 0;

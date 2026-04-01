@@ -37,11 +37,13 @@ extern pthread_mutex_t debug_mutex;
 extern pthread_mutex_t mutex_rcv_socket;
 extern pthread_mutex_t mutex_trace;
 
-guard_lock::guard_lock(pthread_mutex_t* m, std::string h) : mutex(m) {
+guard_lock::guard_lock(pthread_mutex_t* m, std::string h, long tout) : mutex(m) {
 
 	how.clear();
+	how = h;
+	time_out = tout;
 	start_time = zmsec();
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < 20; i++) {
 		if (pthread_mutex_trylock(mutex) == 0) {
 			std::string szlock = name(mutex);
 			szlock.append(" try lock ");
@@ -55,20 +57,25 @@ guard_lock::guard_lock(pthread_mutex_t* m, std::string h) : mutex(m) {
 		MilliSleep(50);
 	}
 
-	std::string szlock = name(mutex);
-	szlock.append(" lock FAILED ").append(name(mutex));
+	std::string szlock;;
+	szlock.assign("lock FAILED ").append(name(mutex));
 	if (!h.empty())
-		szlock.append(how);
-	progStatus.locktrace = true;
-	lock_trace(1, szlock.c_str());
+		szlock.append(", ").append(h);
+	failure_trace(1, szlock.c_str());
 
 }
 
 guard_lock::~guard_lock(void) {
 
 	char szlock[200];
-	snprintf(szlock, sizeof(szlock), "%s locked for %lu msec", name(mutex), (long)(zmsec() - start_time));
+	long now = zmsec();
+	snprintf(szlock, sizeof(szlock), "%s locked for %lu msec", name(mutex), (now - start_time));
 	lock_trace(1, szlock);
+
+	if (now - start_time > time_out) {
+		snprintf(szlock, sizeof(szlock), "%s [ %s ] LOCK TIME: %lu", name(mutex), how.c_str(), (now - start_time));
+		failure_trace(1, szlock);
+	}
 
 	pthread_mutex_unlock(mutex);
 }

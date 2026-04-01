@@ -351,7 +351,7 @@ void FSK::loop_xmt()
 	}
 
 	{
-		guard_lock lck(&fskio_text_mutex);
+		guard_lock lck(&fskio_text_mutex, std::string(__func__) );
 
 		str_buff = FSK_txt_to_send->buffer()->text();
 
@@ -365,7 +365,7 @@ void FSK::loop_xmt()
 		start_xmt();
 		if (idles)
 			while (idles--) send_baudot(LTRS);
-		guard_lock lck(&fskio_text_mutex);
+		guard_lock lck(&fskio_text_mutex, std::string(__func__) );
 		str_buff.erase(0,1);
 		Fl::awake(update_fsk_txt_to_send, this);
 		Fl::awake(btn_fskioSEND_ON, this);
@@ -373,7 +373,7 @@ void FSK::loop_xmt()
 
 	while (FSK_process == SEND) {
 		{
-			guard_lock lck(&fskio_text_mutex);
+			guard_lock lck(&fskio_text_mutex, std::string(__func__) );
 			if (!FSK_new_text.empty()) {
 				str_buff.append(FSK_new_text);
 				FSK_new_text.clear();
@@ -398,7 +398,7 @@ void FSK::loop_xmt()
 			send_char(c);
 		Fl::awake(update_fsk_sent_text, &c);
 		{
-			guard_lock lck(&fskio_text_mutex);
+			guard_lock lck(&fskio_text_mutex, std::string(__func__) );
 			str_buff.erase(0,1);
 		}
 		to_send_updated = false;
@@ -439,7 +439,7 @@ int FSK::init_fsk_thread()
 void FSK::exit_fsk_thread()
 {
 	{
-		guard_lock tlock (&fsk_mutex);
+		guard_lock tlock (&fsk_mutex, std::string(__func__) );
 		fsk_loop_terminate = true;
 		MilliSleep(50);
 	}
@@ -478,7 +478,7 @@ void FSK_send_text(bool state) // state == 1 (xmt), 0 (rcv)
 
 void FSK_clear_text()
 {
-	guard_lock lck(&fskio_text_mutex);
+	guard_lock lck(&fskio_text_mutex, std::string(__func__) );
 	if (fsk_instance) fsk_instance->str_buff.clear();
 	FSK_txt_to_send->clear();
 	FSK_txt_to_send->redraw();

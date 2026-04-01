@@ -392,8 +392,6 @@ void tci_trace(int n, ...) // all args of type const char *
 	write_tracetext(s.str());
 }
 
-bool activate_lock_trace = true;
-
 void lock_trace(int n, ...) // all args of type const char *
 {
 	if (!n) return;
@@ -410,3 +408,36 @@ void lock_trace(int n, ...) // all args of type const char *
 
 	write_tracetext(s.str());
 }
+
+void failure_trace(int n, ...)
+{
+	if (!n) return;
+	if (!tracewindow) make_trace_window();
+
+	std::stringstream s;
+	va_list vl;
+	va_start(vl, n);
+	s << ztime() << " : " << va_arg(vl, const char *);
+	for (int i = 1; i < n; i++)
+		s << " " << va_arg(vl, const char *);
+	va_end(vl);
+
+	write_tracetext(s.str());
+}
+
+void test_trace(int n, ...)
+{
+	if (!n) return;
+	if (!tracewindow) make_trace_window();
+
+	std::stringstream s;
+	va_list vl;
+	va_start(vl, n);
+	s << va_arg(vl, const char *);
+	for (int i = 1; i < n; i++)
+		s << " " << va_arg(vl, const char *);
+	va_end(vl);
+
+	write_tracetext(s.str());
+}
+

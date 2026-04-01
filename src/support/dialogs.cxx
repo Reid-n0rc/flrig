@@ -1903,8 +1903,8 @@ void cb_send_command(std::string command, Fl_Output *resp, bool expect)
 	}
 
 // lock out polling loops until done
-	guard_lock lock1(&mutex_srvc_reqs);
-	guard_lock lock2(&mutex_serial);
+	guard_lock lock1(&mutex_srvc_reqs, std::string(__func__) );
+	guard_lock lock2(&mutex_serial, std::string(__func__) );
 
 	sendCommand(cmd);
 	set_trace(2, "command: ", command.c_str());

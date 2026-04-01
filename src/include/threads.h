@@ -126,13 +126,14 @@ class guard_lock
 {
 public:
 //	guard_lock(pthread_mutex_t* m, int h = 0);
-	guard_lock(pthread_mutex_t* m, std::string h = "");
+	guard_lock(pthread_mutex_t* m, std::string h = "", long tout = 200);
 	~guard_lock(void);
 	const char *name(pthread_mutex_t *m);
 private:
 	pthread_mutex_t* mutex;
 	std::string how;
 	long int start_time;
+	long int time_out;
 //	int how;
 };
 
