@@ -68,6 +68,8 @@ RIG_FT818ND::RIG_FT818ND() {
 	ndigits = 8;
 
 	inuse = onNIL;
+
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 void RIG_FT818ND::initialize()

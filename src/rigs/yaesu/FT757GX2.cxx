@@ -78,6 +78,8 @@ RIG_FT757GX2::RIG_FT757GX2() {
 
 	precision = 10;
 	ndigits = 8;
+
+	read_N = 20; // always responds to query with N bytes of data
 };
 
 void RIG_FT757GX2::initialize()

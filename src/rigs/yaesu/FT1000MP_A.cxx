@@ -172,6 +172,8 @@ RIG_FT1000MP_A::RIG_FT1000MP_A() {
 //	progStatus.rigtrace    = true;
 //	progStatus.xmltrace    = true;
 //	progStatus.trace       = true;
+
+	read_N = 5; // always responds to query with 5 bytes of data
 };
 
 void RIG_FT1000MP_A::init_cmd()

@@ -412,13 +412,13 @@ int  Cserial::ReadBuffer (std::string &buf, int nchars, std::string find1, std::
 	int      bytes = 0;
 	ullint   retval = 0,
 			 start = 0,
-			 tout = progStatus.serial_timeout * 1000;
+			 tout = progStatus.serial_timeout;// * 1000;
 
 	buf.clear();
 
-	start = zusec();
+	start = zmsec();
 
-	while ( (zusec() - start) < tout ) {
+	while ( (zmsec() - start) < tout ) {
 		memset(uctemp, 0, sizeof(uctemp));
 		ioctl( fd, FIONREAD, &bytes);
 		if (bytes) {
@@ -478,23 +478,21 @@ int  Cserial::ReadBuffer (std::string &buf, int nchars, std::string find1, std::
         if ( !find2.empty() &&
 			( buf.find(find2) != std::string::npos ) &&
 			(buf.find(find2) == (buf.length() - find2.length()) ) ) break;
-
 		MilliSleep(1);
 	}
 
-	ullint readtime = zusec() - start;
+	ullint readtime = zmsec() - start;
 
 	if (timedout) {
 		memset(traceinfo, 0, sizeof(traceinfo));
 		snprintf(traceinfo, sizeof(traceinfo), 
-			"ReadBuffer FAILED [%f msec] wanted %d chars, read %lu chars",
-			(zusec() - start) / 1000.0,
+			"ReadBuffer FAILED [%lld msec] wanted %d chars, read %lu chars",
+			(zmsec() - start),// / 1000.0,
 			nchars,
 			buf.length());
 		LOG_ERROR("%s", traceinfo);
+		failure_trace(1, traceinfo);
 
-		if (progStatus.serialtrace)
-			ser_trace(1, traceinfo);
 	} else {
 		memset(traceinfo, 0, sizeof(traceinfo));
 		hex = check_hex(buf.c_str(), buf.length());
@@ -505,8 +503,6 @@ int  Cserial::ReadBuffer (std::string &buf, int nchars, std::string find1, std::
 			(hex ? str2hex(buf.c_str(), buf.length()) : buf.c_str()));
 
 		LOG_DEBUG("%s", traceinfo);
-		if (progStatus.serialtrace)
-			ser_trace(1, traceinfo);
 	}
 
 	return buf.length();
@@ -521,10 +517,11 @@ int  Cserial::ReadBuffer (std::string &buf, int nchars, std::string find1, std::
 int Cserial::WriteBuffer(const char *buff, int n)
 {
 	if (fd < 0) {
-		ser_trace(1, "WriteBuffer(...) fd < 0");
+		failure_trace(1, "WriteBuffer(...) fd < 0");
 		return 0;
 	}
 
+/*
 	std::string sw = std::string(buff, (std::size_t) n);
 	if (progStatus.serialtrace || SERIALDEBUG) {
 		size_t p = sw.rfind("\r\n");
@@ -536,7 +533,7 @@ int Cserial::WriteBuffer(const char *buff, int n)
 			ser_trace(2, "WriteBuffer: ", (hex ? str2hex(sw.c_str(), sw.length()) : sw.c_str()));
 		}
 	}
-
+*/
 	FlushBuffer();
 
 	if (progStatus.serial_write_delay) {

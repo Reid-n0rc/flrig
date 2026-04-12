@@ -74,6 +74,7 @@ RIG_FT920::RIG_FT920() {
 	precision = 1;
 	ndigits = 8;
 
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 int  RIG_FT920::adjust_bandwidth(int m)

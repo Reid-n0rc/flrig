@@ -82,6 +82,8 @@ RIG_FT817BB::RIG_FT817BB() {
 	ndigits = 8;
 
 	inuse = onNIL;
+
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 static void settle(int n)

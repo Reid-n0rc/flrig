@@ -68,6 +68,7 @@ RIG_FT747GX::RIG_FT747GX() {
 	precision = 10;
 	ndigits = 7;
 
+	read_N = 344; // always responds to query with N bytes of data
 };
 
 void RIG_FT747GX::initialize()

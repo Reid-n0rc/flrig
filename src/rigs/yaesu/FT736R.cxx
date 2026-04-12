@@ -75,6 +75,7 @@ RIG_FT736R::RIG_FT736R() {
 	precision = 10;
 	ndigits = 10;
 
+	read_N = 5; // always responds to query with N bytes of data
 };
 
 void RIG_FT736R::init_cmd()

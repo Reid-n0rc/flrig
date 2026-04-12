@@ -263,6 +263,8 @@ rigbase::rigbase()
 	m60_level = 0;
 	an_level = 0;
 
+	read_N = 0;
+
 	initialize();
 }
 
@@ -516,6 +518,8 @@ int rigbase::waitN(int n, int timeout, const char *sz, int pr)
 		return 0;
 	}
 
+test_trace( 3 , __func__, " cmd: ", str2hex(cmd.c_str(), cmd.length()));
+
 	if (progStatus.use_tcpip) {
 		send_to_remote(cmd);
 	}
@@ -528,7 +532,7 @@ int rigbase::waitN(int n, int timeout, const char *sz, int pr)
 	ullint tout = tstart + progStatus.serial_timeout; // minimum of 100 msec
 	std::string tempstr;
 	int nret;
-
+//std::cout << "waitN( " << n << ", " << timeout << ", " << sz << ", " << pr << ")" << std::endl;
 	do {
 		tempstr.clear();
 		if (progStatus.use_tcpip) {
@@ -548,12 +552,16 @@ int rigbase::waitN(int n, int timeout, const char *sz, int pr)
 		MilliSleep(1);
 	} while  ( zmsec() < tout );
 
+test_trace(3, __func__, " read: ", str2hex(replystr.c_str(), replystr.length()));
+
 	static char ctrace[1000];
 	memset(ctrace, 0, 1000);
 	int t = zmsec() - tstart;
 	snprintf( ctrace, sizeof(ctrace), "%s: read %d bytes in %d msec, %s",
 		sz, retnbr, t,
 		(pr == HEX ? str2hex(replystr.c_str(), replystr.length()): replystr.c_str()) );
+
+//std::cout << ctrace << std::endl;
 
 	if (SERIALDEBUG)
 		ser_trace(1, ctrace);

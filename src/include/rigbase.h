@@ -370,11 +370,14 @@ public:
 	int  _nrval2;
 	int  _currmode;
 
+	int  read_N;			// if not zero then read N bytes for query response
+
 	std::string replystr;
 
-protected:
 	std::string cmd; // command string
 	std::string rsp; // expected response string (header etc)
+
+protected:
 
 	std::string to_bcd_be(unsigned long long val, int len);
 	std::string to_bcd(unsigned long long val, int len);

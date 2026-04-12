@@ -70,6 +70,8 @@ RIG_FT817::RIG_FT817() {
 	ndigits = 8;
 
 	inuse = onNIL;
+
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 void RIG_FT817::initialize()

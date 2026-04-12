@@ -74,6 +74,7 @@ RIG_FT890::RIG_FT890() {
 	precision = 10;
 	ndigits = 7;
 
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 void RIG_FT890::init_cmd()

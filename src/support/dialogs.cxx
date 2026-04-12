@@ -54,6 +54,7 @@
 #include "ui.h"
 #include "status.h"
 #include "rig.h"
+#include "rigbase.h"
 #include "socket_io.h"
 #include "rigpanel.h"
 #include "gettext.h"
@@ -1903,24 +1904,36 @@ void cb_send_command(std::string command, Fl_Output *resp, bool expect)
 	}
 
 // lock out polling loops until done
-	guard_lock lock1(&mutex_srvc_reqs, std::string(__func__) );
+//	guard_lock lock1(&mutex_srvc_reqs, std::string(__func__) );
+
 	guard_lock lock2(&mutex_serial, std::string(__func__) );
 
-	sendCommand(cmd);
-	set_trace(2, "command: ", command.c_str());
+	selrig->cmd = cmd;
 
-	if (expect)
-		waitResponse(progStatus.serial_timeout);
+	test_trace(3, __func__, " cmd: ", str2hex(selrig->cmd.c_str(), selrig->cmd.length()));
 
-	std::string retstr = usehex ?
-		str2hex(respstr.c_str(), respstr.length()) :
-		respstr;
-	set_trace(2, "response: ", retstr.c_str());
+	if (expect) {
+		if (selrig->read_N > 0) {
+			selrig->waitN( selrig->read_N, 100, __func__, HEX );
+			respstr = selrig->replystr;
+		}
+		else {
+			sendCommand(cmd);
+			waitResponse(progStatus.serial_timeout);
+		}
+		std::string retstr = usehex ?
+			str2hex(respstr.c_str(), respstr.length()) :
+			respstr;
 
-	if (resp) {
-		resp->value(retstr.c_str());
-		resp->redraw();
-	}
+		test_trace(2, "response: ", retstr.c_str());
+
+		if (resp) {
+			resp->value(retstr.c_str());
+			resp->redraw();
+		}
+	} else
+		sendCommand(cmd);
+
 }
 
 // =====================================================================

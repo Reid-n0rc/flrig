@@ -74,12 +74,14 @@ RIG_FT100D::RIG_FT100D() {
 	has_split = has_split_AB =
 	has_get_info =
 	has_smeter =
+
 	has_power_out =
 	has_swr_control =
 	has_mode_control =
 	has_bandwidth_control =
 	has_ptt_control = true;
 
+	read_N = 32; // maximum number of data bytes
 }
 
 int  RIG_FT100D::adjust_bandwidth(int m)
@@ -158,6 +160,7 @@ W: get_info: Vfo A = 14070000
 
 bool RIG_FT100D::check()
 {
+	return true;
 	init_cmd();
 	cmd[3] = 0x01;
 	cmd[4] = 0xFA;

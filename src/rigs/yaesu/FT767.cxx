@@ -55,6 +55,7 @@ RIG_FT767::RIG_FT767() {
 	precision = 10;
 	ndigits = 8;
 
+	read_N = 20; // always responds to query with N bytes of data
 };
 
 void RIG_FT767::initialize()

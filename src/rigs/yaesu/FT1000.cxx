@@ -122,6 +122,8 @@ RIG_FT1000::RIG_FT1000() {
 	precision = 10;
 	ndigits = 7;
 	max_power = 200;
+
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 

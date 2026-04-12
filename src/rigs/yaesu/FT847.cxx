@@ -76,6 +76,7 @@ RIG_FT847::RIG_FT847() {
 	has_mode_control =
 	has_ptt_control = true;
 
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 void RIG_FT847::init_cmd()

@@ -88,6 +88,8 @@ RIG_FT857D::RIG_FT857D() {
 	precision = 10;
 	ndigits = 9;
 
+	read_N = 5; // always responds to query with 5 bytes of data
+
 };
 
 void RIG_FT857D::initialize() {

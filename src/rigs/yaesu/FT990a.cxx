@@ -99,6 +99,7 @@ RIG_FT990A::RIG_FT990A() {
 	has_ptt_control =
 	has_tune_control = true;
 
+	read_N = 5; // always responds to query with 5 bytes of data
 }
 
 int  RIG_FT990A::adjust_bandwidth(int m)

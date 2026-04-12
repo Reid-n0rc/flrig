@@ -66,6 +66,7 @@ RIG_MARK_V::RIG_MARK_V() {
 	precision = 1;
 	ndigits = 8;
 
+	read_N = 5; // always responds to query with 5 bytes of data
 };
 
 void RIG_MARK_V::initialize()
