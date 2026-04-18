@@ -2712,7 +2712,7 @@ std::cout << "check 3 failed" << std::endl;
 void TRACED(init_title)
 
 	title = PACKAGE;
-	title += " ";
+	title.append(" ").append(PACKAGE_VERSION).append(" / ");
 	title.append(selrig->name_);
 	if (progStatus.xmlrpc_rig) title.append(" CLIENT");
 	mainwindow->label(title.c_str());
