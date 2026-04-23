@@ -578,7 +578,14 @@ void Cserial::FlushBuffer()
 	if (fd < 0)
 		return;
 	tcflush (fd, TCIFLUSH);
-	
+	int bytes;
+	char uctemp[100];
+	do {
+		MilliSleep(5);
+		ioctl( fd, FIONREAD, &bytes);
+		if (bytes) read (fd, uctemp, bytes);
+	} while (bytes);
+
 }
 
 //=============================================================================

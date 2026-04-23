@@ -581,12 +581,12 @@ int rigbase::wait_char(int ch, int n, int timeout, const char *sz, int pr)
 
 	int retnbr = 0;
 
+	replystr.clear();
+
 	if (progStatus.xmlrpc_rig) {
 		replystr = xml_cat_string(cmd);
 		return replystr.length();
 	}
-
-	replystr.clear();
 
 	if(!progStatus.use_tcpip && !RigSerial->IsOpen()) {
 		LOG_DEBUG("TEST %s", sz);
@@ -639,7 +639,7 @@ int rigbase::wait_char(int ch, int n, int timeout, const char *sz, int pr)
 		tries,
 		(pr == HEX ? str2hex(replystr.c_str(), replystr.length()): replystr.c_str()) );
 
-	ser_trace(1, ctrace);
+	test_trace(1, ctrace);
 
 	LOG_DEBUG ("%s", ctrace);
 
