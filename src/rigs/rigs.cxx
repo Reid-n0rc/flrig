@@ -132,6 +132,7 @@ RIG_XI5105		rig_XI5105;
 RIG_Xiegu_G90	rig_XIG90;
 RIG_G90v4		rig_G90v4;
 RIG_X6100		rig_X6100;
+RIG_X6200		rig_X6200;
 RIG_PowerSDR	rig_PowerSDR;
 RIG_FLEX1500	rig_FLEX1500;
 RIG_TX500		rig_TX500;
@@ -250,18 +251,19 @@ rigbase *rigs[] = {
 	&rig_XIG90,		// 100
 	&rig_G90v4,		// 101
 	&rig_X6100,		// 102
-	&rig_PowerSDR,	// 103
-	&rig_FLEX1500,	// 104
-	&rig_TX500,		// 105
-	&rig_QCXP,		// 106
-	&rig_qdx,		// 107
-	&rig_qmx,		// 108
-	&rig_sdr2,		// 109
-	&rig_tci_sundx,	// 110
-	&rig_tci_sunpro,// 111
-	&rig_trusdx,	// 112
-	&rig_smartsdr,  // 113
-	&rig_IC7760,	// 114
+	&rig_X6200,		// 103
+	&rig_PowerSDR,	// 104
+	&rig_FLEX1500,	// 105
+	&rig_TX500,		// 106
+	&rig_QCXP,		// 107
+	&rig_qdx,		// 108
+	&rig_qmx,		// 109
+	&rig_sdr2,		// 110
+	&rig_tci_sundx,	// 111
+	&rig_tci_sunpro,// 112
+	&rig_trusdx,	// 113
+	&rig_smartsdr,  // 114
+	&rig_IC7760,	// 115
 	NULL
 
 };

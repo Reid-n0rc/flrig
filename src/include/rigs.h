@@ -128,6 +128,7 @@
 #include "xiegu/Xiegu-G90.h"
 #include "xiegu/G90.v4.h"
 #include "xiegu/X6100.h"
+#include "xiegu/X6200.h"
 #include "other/sunsdr2.h"
 #include "other/tcisdr.h"
 #include "other/trusdx.h"
@@ -239,17 +240,18 @@ extern RIG_XI5105		rig_XI5105;		// 99
 extern RIG_Xiegu_G90	rig_XIG90;		// 100
 extern RIG_G90v4		rig_g90v4;		// 101
 extern RIG_X6100		rig_X6100;		// 102
-extern RIG_PowerSDR		rig_PowerSDR;	// 103
-extern RIG_FLEX1500		rig_FLEX1500;	// 104
-extern RIG_TX500		rig_TX500;		// 105
-extern RIG_QCXP			rig_QCXP;		// 106
-extern RIG_QDX			rig_qdx;		// 107
-extern RIG_QMX			rig_qmx;		// 108
-extern RIG_SDR2_PRO		rig_sdr2;		// 109
-extern RIG_TCI_SUNDX	rig_tci_sundx;	// 110
-extern RIG_TCI_SUNPRO	rig_tci_sunpro;	// 111
-extern RIG_TRUSDX		rig_trusdx;		// 112
-extern RIG_SmartSDR     rig_smartsdr;   // 113
-extern RIG_IC7760		rig_IC7760;		// 114
+extern RIG_X6200		rig_X6200;		// 103
+extern RIG_PowerSDR		rig_PowerSDR;	// 104
+extern RIG_FLEX1500		rig_FLEX1500;	// 105
+extern RIG_TX500		rig_TX500;		// 106
+extern RIG_QCXP			rig_QCXP;		// 107
+extern RIG_QDX			rig_qdx;		// 108
+extern RIG_QMX			rig_qmx;		// 109
+extern RIG_SDR2_PRO		rig_sdr2;		// 110
+extern RIG_TCI_SUNDX	rig_tci_sundx;	// 111
+extern RIG_TCI_SUNPRO	rig_tci_sunpro;	// 112
+extern RIG_TRUSDX		rig_trusdx;		// 113
+extern RIG_SmartSDR     rig_smartsdr;   // 114
+extern RIG_IC7760		rig_IC7760;		// 115
 
 #endif
