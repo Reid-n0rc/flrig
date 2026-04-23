@@ -415,7 +415,11 @@ unsigned long long RIG_FT710::get_vfoA ()
 	gett("get_vfoA()");
 
 //replystr = "XXXFA014025500;";
+	if (replystr.find("FA") == std::string::npos)
+		return freqA;
+
 	unsigned long long f = 0;
+
 	sscanf(replystr.c_str(), "FA%lld", &f);
 	if (f)
 		freqA = f;
@@ -443,6 +447,9 @@ unsigned long long RIG_FT710::get_vfoB ()
 	gett("get_vfoB()");
 
 //	replystr = "YYYYYFB7300000;";
+	if (replystr.find("FB") == std::string::npos)
+		return freqB;
+
 	unsigned long long f = 0;
 	sscanf(replystr.c_str(), "FB%lld", &f);
 	if (f)
@@ -558,6 +565,9 @@ int RIG_FT710::get_smeter()
 
 	gett("get_smeter()");
 
+	if (replystr.find("SM") == std::string::npos)
+		return 0;
+
 	int mtr = 0;
 	sscanf(replystr.c_str(), "SM0%d", &mtr);
 	mtr = mtr * 100.0 / 256.0;
@@ -574,7 +584,8 @@ int RIG_FT710::get_swr()
 
 	int mtr = 0, dmy = 0;
 	size_t p = replystr.rfind("RM6");
-	sscanf(&replystr[p], "RM6%3d%3d", &mtr, &dmy);
+	if (p != std::string::npos)
+		sscanf(&replystr[p], "RM6%3d%3d", &mtr, &dmy);
 
 	return mtr / 2.56;
 }
@@ -657,20 +668,25 @@ int RIG_FT710::get_power_out()
 	gett("get_power_out()");
 
 	int mtr = 0, dmy = 0;
+	double pwr = 0;
+
 	size_t p = replystr.rfind("RM5");
+	if (p != std::string::npos) {
 
-	sscanf(&replystr[p], "RM5%3d%3d", &mtr, &dmy);
+		sscanf(&replystr[p], "RM5%3d%3d;", &mtr, &dmy);
 
-	size_t i = 0;
-	for (i = 0; i < sizeof(pwrtbl) / sizeof(meterpair) - 1; i++)
-		if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i+1].mtr)
-			break;
-	if (mtr < 0) mtr = 0;
-	if (mtr > 205) mtr = 205;
-	double pwr = (int)ceil(pwrtbl[i].val + 
+		size_t i = 0;
+		for (i = 0; i < sizeof(pwrtbl) / sizeof(meterpair) - 1; i++)
+			if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i+1].mtr)
+				break;
+		if (mtr < 0) mtr = 0;
+		if (mtr > 205) mtr = 205;
+		pwr = (int)ceil(pwrtbl[i].val + 
 			  (pwrtbl[i+1].val - pwrtbl[i].val)*(mtr - pwrtbl[i].mtr) / (pwrtbl[i+1].mtr - pwrtbl[i].mtr));
 
-	if (pwr > 100) pwr = 100;
+		if (pwr > 100) pwr = 100;
+
+	}
 
 	return pwr;
 }
@@ -684,7 +700,8 @@ int RIG_FT710::get_alc()
 
 	int mtr = 0, dmy = 0;
 	size_t p = replystr.rfind("RM4");
-	sscanf(&replystr[p], "RM4%3d%3d", &mtr, &dmy);
+	if (p != std::string::npos)
+		sscanf(&replystr[p], "RM4%3d%3d", &mtr, &dmy);
 
 	return (int)ceil(mtr / 2.56);
 }
@@ -731,7 +748,8 @@ int RIG_FT710::get_volume_control()
 	if (p == std::string::npos) return progStatus.volume;
 	if (p + 6 >= replystr.length()) return progStatus.volume;
 	int val = 0;
-	sscanf(replystr.c_str(), "AG0%d", &val);
+	if (p != std::string::npos)
+		sscanf(replystr.c_str(), "AG0%d", &val);
 	val *= 100;
 	val /= 255;
 	if (val > 100) val = 100;
