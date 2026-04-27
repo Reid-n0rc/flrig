@@ -232,6 +232,7 @@ flrig_SOURCES += \
 	rigs/yaesu/FTdx3000.cxx \
 	rigs/yaesu/FT5000.cxx \
 	rigs/yaesu/FTdx9000.cxx \
+	rigs/yaesu/FTX_1.cxx \
 	fileselector/fileselect.cxx \
 	support/debug.cxx \
 	support/dialogs.cxx \
@@ -491,6 +492,7 @@ EXTRA_DIST = \
 	include/yaesu/FTdx3000.h \
 	include/yaesu/FT5000.h \
 	include/yaesu/FTdx9000.h \
+	include/yaesu/FTX_1.h \
 	include/combo.h \
 	include/gpio_common.h \
 	images/alc.xbm \
