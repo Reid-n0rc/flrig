@@ -46,15 +46,6 @@ bool connected_to_client = false;
 
 XmlRpcClient *flrig_client = (XmlRpcClient *)0;
 
-static bool is_binary(std::string s)
-{
-xml_trace(3, "test for binary: '", s.c_str(), "'");
-	for (size_t n = 0; n < s.length(); n++)
-		if (!isalnum(s[n]))
-			return true;
-	return false;
-}
-
 void xmlrpc_ptt( int PTT)
 {
 	XmlRpcValue Args, result;

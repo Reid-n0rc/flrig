@@ -39,9 +39,64 @@
 #endif
 
 #include "status.h"
+#include "tod_clock.h"
 
 #include <FL/fl_show_colormap.H>
 #include <FL/fl_ask.H>
+
+#define TOD_STALE 500 // 0,5 seconds
+
+struct XML_DATA {
+	unsigned long long int  freq;
+	unsigned long long int freq_tod;
+
+	int mode;
+	unsigned long long int mode_tod;
+
+	int bw;
+	unsigned long long int bw_tod;
+
+	unsigned long long int tod;
+
+	XML_DATA() {
+		freq = mode = bw = 0;
+		freq_tod = mode_tod = bw_tod = zmsec();
+	}
+	~XML_DATA() {};
+
+	void update_freq(unsigned long long int f) {
+		freq = f;
+		freq_tod = zmsec();
+	}
+	bool freq_stale() {
+		return (zmsec() - freq_tod) > TOD_STALE;
+	}
+
+	void update_mode(int md) {
+		mode = md;
+		mode_tod = zmsec();
+	}
+	bool mode_stale() {
+		return (zmsec() - mode_tod) > TOD_STALE;
+	}
+
+	void update_bw(int val) {
+		bw = val;
+		bw_tod = zmsec();
+	}
+	bool bw_stale() {
+		return (zmsec() - bw_tod) > TOD_STALE;
+	}
+
+	void update(unsigned long long int f, int md, int val) {
+		update_freq(f);
+		update_mode(md);
+		update_bw(val);
+	}
+};
+
+extern XML_DATA xml_A;
+extern XML_DATA xml_B;
 
 extern void start_server(int port = 12345);
 extern void exit_server();
