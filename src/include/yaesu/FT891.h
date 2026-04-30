@@ -75,8 +75,15 @@ public:
 	void set_bwB(int val);
 	int  get_bwB();
 
+	const char * get_bwname_(int bw, int md);
+
 	int  adjust_bandwidth(int val);
 	int  def_bandwidth(int val);
+
+	int  get_agc();
+	int  incr_agc();
+	const char *agc_label();
+	int  agc_val();
 
 	int  get_smeter();
 	int  get_swr();
@@ -156,7 +163,14 @@ public:
 	void get_cw_wpm_min_max(int &min, int &max) {
 		min = 4; max = 60; }
 	void enable_keyer();
+	int  get_keyer();
 	void set_cw_qsk();
+	int  get_cw_qsk();
+	void set_cw_delay();
+	int  get_cw_delay();
+	void set_cw_vol();
+	int  get_cw_vol();
+
 	bool set_cw_spot();
 	void set_cw_spot_tone();
 	void get_cw_spot_tone_min_max_step(int &min, int &max, int &step) {
@@ -171,6 +185,11 @@ public:
 		min = 0; max = 100; step = 5; }
 
 	void get_band_selection(int v);
+
+	void setVfoAdj(double v);
+	double getVfoAdj();
+	void get_vfoadj_min_max_step(double &min, double &max, double &step);
+
 };
 
 

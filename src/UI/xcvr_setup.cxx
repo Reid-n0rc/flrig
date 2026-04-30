@@ -88,11 +88,19 @@ Fl_Group *tabGPIO = (Fl_Group *)0;
 #endif
 
 Fl_Group *tabOTHER = (Fl_Group *)0;
+
+	Fl_Group *other_grp1 = (Fl_Group *)0;
 	Fl_ComboBox *selectAuxPort = (Fl_ComboBox *)0;
 	Fl_Check_Button *btnAux_SCU_17 = (Fl_Check_Button *)0;
 
+	Fl_Group *other_grp2 = (Fl_Group *)0;
 	Fl_Counter *cnt_power_limit = (Fl_Counter *)0;
 	Fl_Check_Button *btn_enable_power_limit = (Fl_Check_Button *)0;
+
+	Fl_Group *other_grp3 = (Fl_Group *)0;
+	Fl_Counter *tune_percent_power = (Fl_Counter *)0;
+	Fl_Counter *tune_seconds = (Fl_Counter *)0;
+	Fl_Check_Button *enable_AM_tune = (Fl_Check_Button *)0;
 
 Fl_Group *tabCLIENT = (Fl_Group *)0;
 	Fl_Box *client_text = (Fl_Box *)0;
@@ -577,6 +585,21 @@ static void cb_enable_power_limit(Fl_Check_Button*, void *) {
 	progStatus.enable_power_limit = btn_enable_power_limit->value();
 	if (progStatus.enable_power_limit)
 		execute_setPower();
+}
+
+void cb_tune_percent_power(Fl_Counter *, void *)
+{
+	progStatus.tune_percent_power = tune_percent_power->value();
+}
+
+void cb_tune_seconds(Fl_Counter *, void *)
+{
+	progStatus.tune_seconds = tune_seconds->value();
+}
+
+void cb_enable_AM_tune(Fl_Light_Button *, void *)
+{
+	progStatus.enable_AM_tune = enable_AM_tune->value();
 }
 
 static void cb_disable_CW_ptt(Fl_Check_Button *btn, void*) {
@@ -1552,15 +1575,15 @@ Fl_Group *createAUX(int X, int Y, int W, int H, const char *label)
 	Fl_Group * tabOTHER = new Fl_Group(X, Y, W, H, label);
 	tabOTHER->hide();
 
-	Fl_Group *other_grp1 = new Fl_Group(X+5, Y+5, W-10, (H-10) / 2, "Auxiliary Port");
+	other_grp1 = new Fl_Group(X+5, Y+5, W-10, (H-10) / 3, "Aux Port");
 	other_grp1->box(FL_ENGRAVED_BOX);
 	other_grp1->align(FL_ALIGN_TOP_LEFT | FL_ALIGN_INSIDE);
 
 		Fl_Box *bxsep = new Fl_Box(X + 70, Y + 10, W-140, 45,
-_("Use only if your setup requires a separate\nSerial Port for a special Control Signals"));
+_("Separate Serial Port for special Control Signals"));
 		bxsep->box(FL_FLAT_BOX);
 
-		selectAuxPort = new Fl_ComboBox(X + 130, Y + 60, 240, 22, _("Aux"));
+		selectAuxPort = new Fl_ComboBox(X + 50, Y + 50, 240, 22, _("Aux"));
 		selectAuxPort->tooltip(_("Aux control port"));
 		selectAuxPort->box(FL_DOWN_BOX);
 		selectAuxPort->color(FL_BACKGROUND2_COLOR);
@@ -1574,23 +1597,25 @@ _("Use only if your setup requires a separate\nSerial Port for a special Control
 		selectAuxPort->when(FL_WHEN_RELEASE);
 		selectAuxPort->end();
 
-		btnAux_SCU_17 = new Fl_Check_Button(X + 130, Y + 90, 128, 22, _("  SCU-17 auxiliary\n  Yaesu 2nd USB port"));
-		btnAux_SCU_17->tooltip(_("Set stop bits to ZERO"));
+		btnAux_SCU_17 = new Fl_Check_Button(
+			selectAuxPort->x() + selectAuxPort->w() + 20, Y + 50, 60, 22, _("SCU-17"));
+		btnAux_SCU_17->tooltip(_("Auxiliary port"));
 		btnAux_SCU_17->callback((Fl_Callback*)cb_btnAux_SCU_17);
 		btnAux_SCU_17->value(progStatus.aux_SCU_17);
 
-		btnOkAuxSerial = new Fl_Button(X + W - 70, Y + (H - 10) / 2 - 30, 50, 24, _("Init"));
+		btnOkAuxSerial = new Fl_Button(
+			btnAux_SCU_17->x() + btnAux_SCU_17->w() + 20, Y + 50, 50, 22, _("Init"));
 		btnOkAuxSerial->callback((Fl_Callback*)cb_btnOkAuxSerial);
 
 	other_grp1->end();
 
-	Fl_Group *other_grp2 = new Fl_Group(X+5, Y + (H-10)/2 + 10, W-10, H/2 - 15, _("Power limit"));
+	other_grp2 = new Fl_Group(X+5, Y + 5 + (H-10) / 3, W-10, (H - 10) / 3, _("Power limit"));
 	other_grp2->box(FL_ENGRAVED_BOX);
 	other_grp2->align(FL_ALIGN_TOP_LEFT | FL_ALIGN_INSIDE);
 
 		cnt_power_limit = new Fl_Counter(
-			X+ (W-150)/2, other_grp2->y() + 20,
-			150, 24,
+			X + (W-150)/4, other_grp2->y() + (other_grp2->h() - 22) / 2,
+			150, 22,
 			_("Limit power to % of full"));
 		cnt_power_limit->step(1);
 		cnt_power_limit->minimum(0);
@@ -1600,13 +1625,46 @@ _("Use only if your setup requires a separate\nSerial Port for a special Control
 		cnt_power_limit->callback((Fl_Callback*)cb_power_limit);
 
 		btn_enable_power_limit = new Fl_Check_Button(
-			cnt_power_limit->x(), cnt_power_limit->y() + 45,
+			cnt_power_limit->x() + cnt_power_limit->w() + 20, cnt_power_limit->y(),
 			50, 22,
 			_("Enable power limit"));
 		btn_enable_power_limit->callback((Fl_Callback*)cb_enable_power_limit);
 		btn_enable_power_limit->value(progStatus.enable_power_limit);
 
 	other_grp2->end();
+
+	other_grp3 = new Fl_Group(X + 5, Y + 5 + 2 * (H - 10) / 3, W-10, (H-10) / 3, _("AM tune"));
+	other_grp3->box(FL_ENGRAVED_BOX);
+	other_grp3->align(FL_ALIGN_TOP_LEFT | FL_ALIGN_INSIDE);
+
+		tune_percent_power = new Fl_Counter(
+			other_grp3->x() + 40, other_grp3->y() + (other_grp3->h() - 22) / 2,
+			80, 22, _("% full power"));
+			tune_percent_power->type(1);
+			tune_percent_power->minimum(0);
+			tune_percent_power->step(1);
+			tune_percent_power->maximum(100);
+			tune_percent_power->value(progStatus.tune_percent_power);
+			tune_percent_power->callback((Fl_Callback *)cb_tune_percent_power);
+
+		tune_seconds = new Fl_Counter(
+			tune_percent_power->x() + tune_percent_power->w() + 30, tune_percent_power->y(),
+			80, 22, _("Tune xxx sec's"));
+			tune_seconds->type(1);
+			tune_seconds->minimum(0);
+			tune_seconds->maximum(10);
+			tune_seconds->step(1);
+			tune_seconds->value(progStatus.tune_seconds);
+			tune_seconds->callback((Fl_Callback *)cb_tune_seconds);
+
+		enable_AM_tune = new Fl_Check_Button(
+			tune_seconds->x() + tune_seconds->w() + 30, tune_percent_power->y(),
+			50, 22, _("Enable AM tune"));
+			enable_AM_tune->value(progStatus.enable_AM_tune);
+			enable_AM_tune->callback((Fl_Callback *)cb_enable_AM_tune);
+
+	other_grp3->end();
+
 	tabOTHER->end();
 
 	return tabOTHER;

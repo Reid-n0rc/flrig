@@ -81,15 +81,17 @@ void TRACED(restore_rig_vals_, XCVR_STATE &xcvrvfo)
 void TRACED(restore_xcvr_vals)
 
 	if (progStatus.start_stop_trace) ss_trace(true);
+	else ss_trace(false);
 
 	update_progress(0);
 
 	guard_lock serial_lock(&mutex_serial, "restore_xcvr_vals");
-	trace(1, "restore_xcvr_vals()");
 
 	if (selrig->inuse == onA) {
 		selrig->selectB();
 	}
+
+	trace(2, "Restore xcvr B values:\n", print(xcvr_vfoB));
 
 	if (progStatus.restore_mode) {
 		selrig->set_modeB(xcvr_vfoB.imode);
@@ -104,9 +106,9 @@ void TRACED(restore_xcvr_vals)
 
 	restore_rig_vals_(xcvr_vfoB);
 
-	trace(2, "Restored xcvr B:\n", print(xcvr_vfoB));
-
 	selrig->selectA();
+
+	trace(2, "Restore xcvr A values:\n", print(xcvr_vfoA));
 
 	if (progStatus.restore_mode) {
 		selrig->set_modeA(xcvr_vfoA.imode);
@@ -125,8 +127,6 @@ void TRACED(restore_xcvr_vals)
 	}
 
 	restore_rig_vals_(xcvr_vfoA);
-
-	trace(2, "Restored xcvr A:\n", print(xcvr_vfoA));
 
 	if (progStatus.start_stop_trace) ss_trace(false);
 

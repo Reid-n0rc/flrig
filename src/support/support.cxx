@@ -1343,10 +1343,6 @@ void serviceXCVR(VFOQUEUE nuvals)
 		case sA: // select A
 			selrig->selectA();
 			vfo = &vfoA;
-			if (selrig->name_ == rig_FT891.name_) {
-				// Restore mode, then freq and bandwidth after select
-				yaesu891UpdateA(&vfoA);
-			}
 			if (selrig->name_ == rig_FTdx10.name_) {
 				FTdx10_UpdateA(&vfoA);
 			}
@@ -1359,10 +1355,6 @@ void serviceXCVR(VFOQUEUE nuvals)
 		case sB: // select B
 			selrig->selectB();
 			vfo = &vfoB;
-			if (selrig->name_ == rig_FT891.name_) {
-				// Restore mode, then freq and bandwidth after select
-					yaesu891UpdateB(&vfoB);
-				}
 			if (selrig->name_ == rig_FTdx10.name_) {
 				FTdx10_UpdateB(&vfoB);
 			}
@@ -2333,6 +2325,7 @@ void updateSelect() {
 			szatag[i] = oplist[n].alpha_tag[i];
 			if (szatag[i] == '\n') szatag[i] = ' ';
 		}
+		
 		snprintf(szline, sizeof(szline),
 "@F%d@S%d@r%.3f\t\
 @F%d@S%d@.|\t\
@@ -2481,14 +2474,15 @@ void movFreqB(Fl_Widget *, void *) {
 void execute_swapAB()
 {
 	if (selrig->canswap()) {
-		selrig->swapAB();
 		if (selrig->ICOMmainsub) {
+			selrig->swapAB();
 			XCVR_STATE temp = vfoA;
 			vfoA = vfoB;
 			vfoB = temp;
 			selrig->selectA();
 			vfo = &vfoA;
 		} else if (selrig->ICOMrig) {
+			selrig->swapAB();
 			if (selrig->inuse == onB) {
 				selrig->selectA();
 				vfo = &vfoA;
@@ -2497,20 +2491,9 @@ void execute_swapAB()
 				vfo = &vfoB;
 			}
 		} else if (selrig->name_ == rig_FT891.name_) {
-			// No need for extra select, as swapAB accomplishes this
-			if (selrig->inuse == onB) {
-				selrig->selectA();
-				vfo = &vfoA;
-				// Restore mode, then frequency and bandwidth after swap.
-				yaesu891UpdateA(&vfoA);
-			}
-			else {
-				selrig->selectB();
-				vfo = &vfoB;
-				// Restore mode, then frequency and bandwidth after swap.
-				yaesu891UpdateB(&vfoB);
-			}
+			selrig->swapAB();
 		} else if (selrig->name_ == rig_FTdx10.name_ ) {
+			selrig->swapAB();
 			XCVR_STATE temp = vfoB;
 			vfoB = vfoA;
 			vfoA = temp;
@@ -2519,6 +2502,7 @@ void execute_swapAB()
 			else
 				vfo = &vfoA;
 		} else {
+			selrig->swapAB();
 			XCVR_STATE temp = vfoB;
 			vfoB = vfoA;
 			vfoA = temp;
@@ -3580,8 +3564,46 @@ void setPower()
 void cbTune()
 {
 	guard_lock serial_lock( &mutex_serial, std::string(__func__) );
-	trace(1, "cbTune()");
-	selrig->tune_rig(2);
+
+	if (progStatus.enable_AM_tune) {
+// find AM mode in modes_ vector
+		int mAM = -1;
+		rigmodes_ = selrig->modes_;
+		for (size_t n = 0; n < rigmodes_.size(); n++) {
+			if (rigmodes_[n].find("AM") != std::string::npos) {
+				mAM = n;
+				break;
+			}
+		}
+		if (mAM == -1) return;
+
+		double pwr_level = selrig->get_power_control();
+		int md = vfo->imode;
+		if (selrig->inuse == onA)
+			selrig->set_modeA(mAM);
+		else
+			selrig->set_modeB(mAM);
+
+		selrig->set_power_control( progStatus.tune_percent_power * sldrPOWER->maximum() / 100.0 );
+
+		selrig->set_PTT_control(1);
+		for (int n = 0; n < progStatus.tune_seconds * 20; n++) {
+			MilliSleep(50);
+			Fl::awake();
+		}
+		selrig->set_PTT_control(0);
+
+		selrig->set_power_control( pwr_level );
+
+		if (selrig->inuse == onA) {
+			selrig->set_modeA(md);
+		} else {
+			selrig->set_modeB(md);
+		}
+	} else  {
+		trace(1, "cbTune()");
+		selrig->tune_rig(2);
+	}
 }
 
 void cb_tune_on_off()
@@ -3858,10 +3880,15 @@ void updateFwdPwr(void *)
 		sldrFwdPwr->show();
 		scalePower->show();
 
-		sldrFwdPwr->value(power);
-		sldrFwdPwr->redraw();
+		if  ((progStatus.pwr_scale == 9 && pwrval > 100.0) || (progStatus.pwr_scale == 8)) {
+
+			power = 200 * sqrt( pwrval / 200.0 );
+
+		}
+
 		sigbar_PWR->value(power);
-		sigbar_PWR->redraw();
+		sldrFwdPwr->value(power);
+
 	}
 
 }

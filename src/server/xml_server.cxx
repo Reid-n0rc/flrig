@@ -1224,11 +1224,16 @@ public:
 
 		if (!xcvr_online || disable_xmlrpc->value()) return;
 
-
-
-		int BW = (selrig->inuse == onB) ? vfoB.iBW : vfoA.iBW;
-		int mode = (selrig->inuse == onB) ? vfoB.imode : vfoA.imode;
-
+		int BW = 0, mode = 0;
+		if (selrig->inuse == onB) {
+			guard_lock serial_lock (&mutex_serial, "xml rig get bw");
+			mode = selrig->get_modeB();
+			BW = selrig->get_bwB();
+		} else {
+			guard_lock serial_lock (&mutex_serial, "xml rig get bw");
+			mode = selrig->get_modeA();
+			BW = selrig->get_bwA();
+		}
 		try {
 // guard lock not need, serial port not accessed
 //			guard_lock serial_lock(&mutex_serial, "xml rig_get_bw");
@@ -1689,8 +1694,12 @@ public:
 			result = 0;
 			return;
 		}
-		guard_lock serial_lock(&mutex_serial, "xml tune");
-		selrig->tune_rig(2);
+		if (progStatus.enable_AM_tune)
+			cbTune();
+		else {
+			guard_lock serial_lock(&mutex_serial, "xml tune");
+			selrig->tune_rig(2);
+		}
 	}
 
 	std::string help() { return std::string("enable transceiver tune function"); }

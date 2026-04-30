@@ -150,7 +150,12 @@ void TRACED(vfo_startup_data, XCVR_STATE &xcvrvfo)
 
 void TRACED(vfoA_startup_data)
 
+	if (progStatus.start_stop_trace) ss_trace(true);
+	else ss_trace(false);
+
 	update_progress(progress->value() + 4);
+
+	rig_trace(1, "Read Xcvr vfo A values:\n");
 
 	if (selrig->has_get_info)
 		selrig->get_info();
@@ -164,10 +169,19 @@ void TRACED(vfoA_startup_data)
 
 	vfo_startup_data(xcvr_vfoA);
 
-	rig_trace(2, "Xcvr vfo A:\n", print(xcvr_vfoA));
+	rig_trace(1, print(xcvr_vfoA));
+
+	if (progStatus.start_stop_trace) ss_trace(false);
+
 }
 
 void TRACED(vfoB_startup_data) 
+
+	if (progStatus.start_stop_trace) ss_trace(true);
+	else ss_trace(false);
+
+	rig_trace(1, "Read Xcvr vfo B values:\n");
+
 	update_progress(progress->value() + 4);
 
 	if (selrig->has_get_info)
@@ -182,7 +196,10 @@ void TRACED(vfoB_startup_data)
 
 	vfo_startup_data(xcvr_vfoB);
 
-	rig_trace(2, "Xcvr vfo B:\n", print(xcvr_vfoB));
+	rig_trace(1, print(xcvr_vfoB));
+
+	if (progStatus.start_stop_trace) ss_trace(false);
+
 }
 
 void TRACED(rig_startup_data)

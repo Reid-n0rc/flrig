@@ -24,7 +24,7 @@
 #include "support.h"
 #include "trace.h"
 
-#define FL891_WAIT_TIME 200
+#define FL891_WAIT_TIME 400
 
 enum mFT891 {
    mLSB, mUSB, mCW, mFM,  mAM, mTTYL, mCWR, mDATAL, mTTYU, mFMN, mDATAU, mAMN };
@@ -77,34 +77,37 @@ static int FT891_wvals_CW[] = {
 
 // Single bandwidth modes
 static std::vector<std::string>FT891_widths_AMFMnar;
-static const char *vFT891_widths_AMFMnar[]  = { "NARR" };
+static const char *vFT891_widths_AMFMnar[]  = { "NARROW" };
 static std::vector<std::string>FT891_widths_AMFMnorm;
 static const char *vFT891_widths_AMFMnorm[] = { "NORM" };
 
 static const int FT891_wvals_AMFM[] = { 0, WVALS_LIMIT };
-
-static const int FT891_wvals_NN[] = {0, 1, WVALS_LIMIT};
 
 //----------------------------------------------------------------------
 static std::vector<std::string>FT891_att_labels;
 static const char *vFT891_att_labels[] = { "ATT", "12 dB" };
 
 static std::vector<std::string>FT891_pre_labels;
-static const char *vFT891_pre_labels[] = { "IPO", "Amp" };
+static const char *vFT891_pre_labels[] = { "Amp", "IPO" };
 //----------------------------------------------------------------------
 
 static GUI rig_widgets[]= {
-	{ (Fl_Widget *)btnVol,        2, 125,  50 },
-	{ (Fl_Widget *)sldrVOLUME,   54, 125, 156 },
-	{ (Fl_Widget *)sldrRFGAIN,   54, 145, 156 },
-	{ (Fl_Widget *)btnIFsh,     214, 105,  50 },
-	{ (Fl_Widget *)sldrIFSHIFT, 266, 105, 156 },
-	{ (Fl_Widget *)btnNotch,    214, 125,  50 },
-	{ (Fl_Widget *)sldrNOTCH,   266, 125, 156 },
-	{ (Fl_Widget *)sldrMICGAIN, 266, 145, 156 },
-	{ (Fl_Widget *)sldrPOWER,   266, 165, 156 },
-	{ (Fl_Widget *)btnNR,         2, 165,  50 },
-	{ (Fl_Widget *)sldrNR,       54, 165, 156 },
+	{ (Fl_Widget *)btnVol,        2, 125,  50 }, // 0
+	{ (Fl_Widget *)sldrVOLUME,   54, 125, 368 }, // 1
+	{ (Fl_Widget *)sldrRFGAIN,   54, 145, 156 }, // 2
+	{ (Fl_Widget *)sldrSQUELCH, 266, 145, 156 }, // 3
+
+	{ (Fl_Widget *)sldrMICGAIN,  54, 165, 156 }, // 4
+	{ (Fl_Widget *)btnNotch,    214, 165,  50 }, // 5
+	{ (Fl_Widget *)sldrNOTCH,   266, 165, 156 }, // 6
+
+	{ (Fl_Widget *)btnNR,         2, 185,  50 }, // 7
+	{ (Fl_Widget *)sldrNR,       54, 185, 156 }, // 8
+	{ (Fl_Widget *)btnIFsh,     214, 185,  50 }, // 9
+	{ (Fl_Widget *)sldrIFSHIFT, 266, 185, 156 }, // 10
+
+	{ (Fl_Widget *)sldrPOWER,    54, 205, 368 }, // 11
+
 	{ (Fl_Widget *)NULL,          0,   0,   0 }
 };
 
@@ -123,7 +126,7 @@ RIG_FT891::RIG_FT891() {
 	serial_retries = 2;
 
 	serial_write_delay = 0;
-	serial_post_write_delay = 50;
+	serial_post_write_delay = 5;
 
 	serial_timeout = 50;
 	serial_rtscts = true;
@@ -141,7 +144,7 @@ RIG_FT891::RIG_FT891() {
 	has_compON =
 	has_a2b =
 	has_ext_tuner =
-	has_xcvr_auto_on_off =
+//	has_xcvr_auto_on_off =
 	has_split =
 //	has_split_AB =
 	has_noise_reduction =
@@ -153,15 +156,17 @@ RIG_FT891::RIG_FT891() {
 	has_vox_hang =
 	has_vox_on_dataport =
 
-//	has_vfo_adj =
+	has_vfo_adj =
 
 	has_cw_wpm =
 	has_cw_keyer =
-//	has_cw_vol =
+	has_cw_vol =
 	has_cw_spot =
 	has_cw_spot_tone =
 	has_cw_qsk =
+	has_cw_delay =
 	has_cw_weight =
+	has_cw_zero_in =
 
 	has_band_selection =
 
@@ -220,14 +225,15 @@ void RIG_FT891::initialize()
 	rig_widgets[0].W = btnVol;
 	rig_widgets[1].W = sldrVOLUME;
 	rig_widgets[2].W = sldrRFGAIN;
-	rig_widgets[3].W = btnIFsh;
-	rig_widgets[4].W = sldrIFSHIFT;
+	rig_widgets[3].W = sldrSQUELCH;
+	rig_widgets[4].W = sldrMICGAIN;
 	rig_widgets[5].W = btnNotch;
 	rig_widgets[6].W = sldrNOTCH;
-	rig_widgets[7].W = sldrMICGAIN;
-	rig_widgets[8].W = sldrPOWER;
-	rig_widgets[9].W = btnNR;
-	rig_widgets[10].W = sldrNR;
+	rig_widgets[7].W = btnNR;
+	rig_widgets[8].W = sldrNR;
+	rig_widgets[9].W = btnIFsh;
+	rig_widgets[10].W = sldrIFSHIFT;
+	rig_widgets[11].W = sldrPOWER;
 
 // set progStatus defaults
 	if (progStatus.notch_val < 10) progStatus.notch_val = 1500;
@@ -245,7 +251,7 @@ void RIG_FT891::initialize()
 		progStatus.vox_hang = 500;
 	}
 // Disable Auto Information mode
-	sendCommand("AI0;");
+//	sendCommand("AI0;");
 
 	op_yaesu_select60->deactivate();
 
@@ -257,12 +263,12 @@ void RIG_FT891::post_initialize()
 
 bool RIG_FT891::check ()
 {
-	cmd = rsp = "FA";
-	cmd += ';';
-	get_trace(1, "check()");
-	int ret = wait_char(';',12, FL891_WAIT_TIME, "check", ASC);
+	cmd = "ID;";
+	get_trace(1, __func__);
+	wait_char(';', 7, 500, __func__, ASC);
 	gett("");
-	if (ret >= 12) return true;
+
+	if (replystr.rfind("ID") != std::string::npos) return true;
 	return false;
 }
 
@@ -277,8 +283,8 @@ unsigned long long RIG_FT891::get_vfoA ()
 	}
 	cmd += ';';
 
-	get_trace(1, "get_vfoA()");
-	wait_char(';',12, FL891_WAIT_TIME, "get vfo A", ASC);
+	get_trace(1, __func__);
+	wait_char(';',12, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
 	size_t p = replystr.rfind(rsp);
@@ -308,10 +314,10 @@ void RIG_FT891::set_vfoA (unsigned long long freq)
 		freq /= 10;
 	}
 
-	set_trace(1, "set_vfoA");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET vfo A", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 unsigned long long RIG_FT891::get_vfoB ()
@@ -324,8 +330,8 @@ unsigned long long RIG_FT891::get_vfoB ()
 		cmd = rsp = "FB";
 	}
 	cmd += ';';
-	get_trace(1, "get_vfoB()");
-	wait_char(';',12, FL891_WAIT_TIME, "get vfo B", ASC);
+	get_trace(1, __func__);
+	wait_char(';',12, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
 	size_t p = replystr.rfind(rsp);
@@ -356,38 +362,42 @@ void RIG_FT891::set_vfoB (unsigned long long freq)
 		freq /= 10;
 	}
 
-	set_trace(1, "set_vfoB");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET vfo B", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::selectA()
 {
-	if (rigbase::isOnA()) return;
-	rigbase::selectA();
-	
+	if (inuse == onA) return;
+
 	cmd = "SV;";
 
 	set_trace(1, "select_A");
 	sendCommand(cmd);
 	sett("");
 	showresp(WARN, ASC, "select A", cmd, replystr);
+
 	inuse = onA;
+
+	set_bwA(bwA);
 }
 
 void RIG_FT891::selectB()
 {
-	if (rigbase::isOnB()) return;
-	rigbase::selectB();
+	if (inuse == onB) return;
 
 	cmd = "SV;";
 
-	set_trace(1, "selectB");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "select B", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+
 	inuse = onB;
+
+	set_bwB(bwB);
 }
 
 
@@ -395,32 +405,38 @@ void RIG_FT891::A2B()
 {
 	cmd = "AB;";
 
-	set_trace(1, "A2B()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "vfo A->B", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::B2A()
 {
 	cmd = "BA;";
 
-	set_trace(1, "B2A()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "vfo B->A", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::swapAB()
 {
-	rigbase::swapAB();
-
 	cmd = "SV;";
 
-	set_trace(1, "swapAB()");
+	int temp = bwB;
+	bwB = bwA;  bwA = temp;
+	temp = modeB;
+	modeB = modeA; modeA = temp;
+
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "vfo A<>B", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+
+	set_bwA(bwA);
+
 }
 
 bool RIG_FT891::can_split()
@@ -444,11 +460,10 @@ void RIG_FT891::set_split(bool val)
 
 int RIG_FT891::get_split()
 {
-	cmd = rsp = "ST";
-	cmd += ";";
+	cmd = "ST;";
 	wait_char(';', 4, 100, "Get split", ASC);
 	gett("get split()");
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("ST");
 	if (p == std::string::npos) return 0;
 	int split = replystr[p+2] - '0';
 
@@ -457,13 +472,12 @@ int RIG_FT891::get_split()
 
 int RIG_FT891::get_smeter()
 {
-	cmd = rsp = "SM0";
-	cmd += ';';
-	get_trace(1, "get_smeter()");
-	wait_char(';',7, FL891_WAIT_TIME, "get smeter", ASC);
+	cmd = "SM0;";
+	get_trace(1, __func__);
+	wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("SM");
 	if (p == std::string::npos) return 0;
 	if (p + 6 >= replystr.length()) return 0;
 	int mtr = atoi(&replystr[p+3]);
@@ -471,63 +485,113 @@ int RIG_FT891::get_smeter()
 	return mtr;
 }
 
+static meterpair swrtbl[] = {
+{ 0, 0 },
+{43, 12.0 },
+{86, 24.0 },
+{129, 48.0 },
+{255, 100.0 }
+};
+
 int RIG_FT891::get_swr()
 {
-	cmd = rsp = "RM6";
-	cmd += ';';
-	get_trace(1, "get_swr()");
-	wait_char(';',7, FL891_WAIT_TIME, "get swr", ASC);
+	cmd = "RM6;";
+	get_trace(1, __func__);
+	wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("RM");
 	if (p == std::string::npos) return 0;
 	if (p + 6 >= replystr.length()) return 0;
+
 	int mtr = atoi(&replystr[p+3]);
-	return (int)ceil(mtr / 2.56);
+//	return (int)ceil(mtr / 2.56);
+
+	size_t i = 0;
+	for (i = 0; i < sizeof(swrtbl) / sizeof(*swrtbl) - 1; i++)
+		if (mtr >= swrtbl[i].mtr && mtr < swrtbl[i+1].mtr)
+			break;
+	int val = (int)ceil(
+				 swrtbl[i].val + 
+				(swrtbl[i+1].val - swrtbl[i].val) * (mtr - swrtbl[i].mtr) / (swrtbl[i+1].mtr - swrtbl[i].mtr));
+	if (val > 100) val = 100;
+
+	return val;
 }
 
 int RIG_FT891::get_alc()
 {
-	cmd = rsp = "RM4";
-	cmd += ';';
-	get_trace(1, "get_alc()");
-	wait_char(';',7, FL891_WAIT_TIME, "get alc", ASC);
+	cmd = "RM4;";
+	get_trace(1, __func__);
+	wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("RM");
 	if (p == std::string::npos) return 0;
 	if (p + 6 >= replystr.length()) return 0;
 	int mtr = atoi(&replystr[p+3]);
+
 	return (int)ceil(mtr / 2.56);
 }
 
+static meterpair pwrtbl[] = {
+{0, 0},
+{35, 5.0},
+{59, 10.0},
+{72, 15.0},
+{86, 20.0},
+{96, 25.0},
+{107, 30.0},
+{119, 35.0},
+{129, 40.0},
+{141, 45.0},
+{150, 50.0},
+{155, 55.0},
+{161, 60.0},
+{166, 65.0},
+{173, 70.0},
+{179, 75.0},
+{184, 80.0},
+{191, 85.0},
+{196, 90.0},
+{202, 95.0},
+{208, 100.0}
+};
+
 int RIG_FT891::get_power_out()
 {
-	cmd = rsp = "RM5";
-	get_trace(1, "get_power_out()");
-	sendCommand(cmd.append(";"));
+	cmd = "RM5;";
+	get_trace(1, __func__);
+	wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
-	wait_char(';',7, FL891_WAIT_TIME, "get pout", ASC);
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("RM5");
 	if (p == std::string::npos) return 0;
 	if (p + 6 >= replystr.length()) return 0;
 
-// this needs to be measured and adjusted
 	int mtr = atoi(&replystr[p+3]);
-	return (int)ceil(mtr / 2.56);
+
+	size_t i = 0;
+	for (i = 0; i < sizeof(pwrtbl) / sizeof(*pwrtbl) - 1; i++)
+		if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i+1].mtr)
+			break;
+	int val = (int)ceil(
+				 pwrtbl[i].val + 
+				(pwrtbl[i+1].val - pwrtbl[i].val) * (mtr - pwrtbl[i].mtr) / (pwrtbl[i+1].mtr - pwrtbl[i].mtr));
+	if (val > 100) val = 100;
+
+	return val;
 }
 
 // Transceiver power level
 double RIG_FT891::get_power_control()
 {
-	cmd = rsp = "PC";
-	cmd += ';';
-	get_trace(1, "get_power_control()");
-	wait_char(';',6, FL891_WAIT_TIME, "get power", ASC);
+	cmd = "PC;";
+	get_trace(1, __func__);
+	wait_char(';',6, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("PC");
 	if (p == std::string::npos) return progStatus.power_level;
 	if (p + 5 >= replystr.length()) return progStatus.power_level;
 
@@ -544,22 +608,21 @@ void RIG_FT891::set_power_control(double val)
 		ival /= 10;
 	}
 
-	set_trace(1, "set_power_control()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET power", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 // Volume control return 0 ... 100
 int RIG_FT891::get_volume_control()
 {
-	cmd = rsp = "AG0";
-	cmd += ';';
-	get_trace(1, "get_volume_control()");
-	wait_char(';',7, FL891_WAIT_TIME, "get vol", ASC);
+	cmd = "AG0;";
+	get_trace(1, __func__);
+	wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("AG");
 	if (p == std::string::npos) return progStatus.volume;
 	if (p + 6 >= replystr.length()) return progStatus.volume;
 	int val = round(atoi(&replystr[p+3]) / 2.55);
@@ -576,10 +639,10 @@ void RIG_FT891::set_volume_control(int val)
 		ivol /= 10;
 	}
 
-	set_trace(1, "set_volume_control()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET vol", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 // Tranceiver PTT on/off
@@ -587,23 +650,23 @@ void RIG_FT891::set_PTT_control(int val)
 {
 	cmd = val ? "TX1;" : "TX0;";
 
-	set_trace(1, "set_PTT_control()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET PTT", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+
 	ptt_ = val;
 }
 
 int RIG_FT891::get_PTT()
 {
 	cmd = "TX;";
-	rsp = "TX";
 
-	get_trace(1, "get_PTT()");
-	waitN(4, 100, "get PTT", ASC);
+	get_trace(1, __func__);
+	wait_char(';', 4, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("TX");
 	if (p == std::string::npos) return ptt_;
 	ptt_ =  (replystr[p+2] != '0' ? 1 : 0);
 
@@ -615,21 +678,20 @@ int RIG_FT891::get_PTT()
 void RIG_FT891::tune_rig(int)
 {
 	cmd = "AC012;";
-	set_trace(1, "tune_rig()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "tune rig", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FT891::get_tune()
 {
-	cmd = rsp = "AC";
-	cmd += ';';
-	get_trace(1, "get_tune()");
-	waitN(5, 100, "get tune", ASC);
+	cmd = "AC;";
+	get_trace(1, __func__);
+	wait_char(';', 6, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
-
-	size_t p = replystr.rfind(rsp);
+test_trace( 4, __func__, cmd.c_str(), " : ", replystr.c_str());
+	size_t p = replystr.rfind("AC");
 	if (p == std::string::npos) return 0;
 	int val = replystr[p+4] - '0';
 	return !(val < 2);
@@ -640,21 +702,20 @@ void RIG_FT891::set_attenuator(int val)
 	if (val) cmd = "RA01;";
 	else     cmd = "RA00;";
 
-	set_trace(1, "set_attenuator()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET att", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FT891::get_attenuator()
 {
-	cmd = rsp = "RA0";
-	cmd += ';';
-	get_trace(1, "get_attenuator()");
-	wait_char(';',5, FL891_WAIT_TIME, "get att", ASC);
+	cmd = "RA0;";
+	get_trace(1, __func__);
+	wait_char(';', 5, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("RA");
 	if (p == std::string::npos) return progStatus.attenuator;
 	if (p + 3 >= replystr.length()) return progStatus.attenuator;
 	atten_level = replystr[p+3] - '0';
@@ -664,27 +725,28 @@ int RIG_FT891::get_attenuator()
 
 void RIG_FT891::set_preamp(int val)
 {
-	if (val) cmd = "PA01;";
-	else     cmd = "PA00;";
+	if (val) cmd = "PA00;";
+	else     cmd = "PA01;";
 	preamp_level = val;
+	preamp_state = (preamp_level == 0);
 
-	set_trace(1, "set_preamp()");
+	set_trace(1, __func__);
 	sendCommand (cmd);
 	sett("");
-	showresp(WARN, ASC, "SET preamp", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FT891::get_preamp()
 {
-	cmd = rsp = "PA0";
-	cmd += ';';
-	get_trace(1, "get_preamp()");
-	wait_char(';',5, FL891_WAIT_TIME, "get pre", ASC);
+	cmd = "PA0;";
+	get_trace(1, __func__);
+	wait_char(';',5, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
-	if (p != std::string::npos)
-		preamp_level = replystr[p+3] - '0';
+	size_t p = replystr.rfind("PA0");
+	if (p == std::string::npos) return 0;
+
+	preamp_state = preamp_level = (replystr[p+3] == '0');
 	return preamp_level;
 }
 
@@ -745,12 +807,13 @@ std::vector<std::string>& RIG_FT891::bwtable(int n)
 
 void RIG_FT891::set_sideband(int md)
 {
-	set_trace(1, "set_sideband()");
 	switch (md) {
-		case mLSB: case mUSB:
+		case mLSB: 
+		case mUSB:
 			cmd = "EX1107";
 			cmd += (md == mLSB ? '1' : '0');
 			cmd += ';';
+			set_trace(1, "set_SSB_sideband()");
 			sendCommand(cmd);
 			showresp(WARN, ASC, "SET SSB sideband", cmd, replystr);
 			break;
@@ -758,6 +821,7 @@ void RIG_FT891::set_sideband(int md)
 			cmd = "EX0707";
 			cmd += (md == mCWR ? '1' : '0');
 			cmd += ';';
+			set_trace(1, "set_CW_sideband()");
 			sendCommand(cmd);
 			showresp(WARN, ASC, "SET CW sideband", cmd, replystr);
 			break;
@@ -766,6 +830,7 @@ void RIG_FT891::set_sideband(int md)
 			cmd += (md == mTTYL ? '1' : '0');
 			cmd += ';';
 			sendCommand(cmd);
+			set_trace(1, "set_TTY_sideband()");
 			showresp(WARN, ASC, "SET TTY sideband", cmd, replystr);
 			break;
 		case mDATAL: case mDATAU:
@@ -773,72 +838,59 @@ void RIG_FT891::set_sideband(int md)
 			cmd += (md == mDATAL ? '1' : '0');
 			cmd += ';';
 			sendCommand(cmd);
+			set_trace(1, "set_DATA_sideband()");
 			showresp(WARN, ASC, "SET DATA sideband", cmd, replystr);
 			break;
 		default:
 			break;
 	}
-	gett("");
+	sett("");
 	return;
 }
 
 int RIG_FT891::get_sideband(int md)
 {
 	size_t p;
-	get_trace(1, "get_sideband()");
+	int sb = 0;
 	switch (md) {
 		case mLSB: case mUSB:
 			cmd = "EX1107;";
+			get_trace(1, "get_SSB_sideband()");
 			wait_char(';', 8, FL891_WAIT_TIME, "GET SSB sideband", ASC);
-			p = replystr.find("EX");
-			if (p != std::string::npos) {
-				gett("");
-				return replystr[p+6] - '0';
-			}
 			break;
 		case mCW: case mCWR:
 			cmd = "EX0707;";
+			get_trace(1, "get_CW_sideband()");
 			wait_char(';', 8, FL891_WAIT_TIME, "GET CW sideband", ASC);
-			p = replystr.find("EX");
-			if (p != std::string::npos) {
-				gett("");
-				return replystr[p+6] - '0';
-			}
 			break;
 		case mTTYL: case mTTYU:
 			cmd = "EX1011;";
+			get_trace(1, "get_TTY_sideband()");
 			wait_char(';', 8, FL891_WAIT_TIME, "GET TTY sideband", ASC);
-			p = replystr.find("EX");
-			if (p != std::string::npos) {
-				gett("");
-				return replystr[p+6] - '0';
-			}
 			break;
 		case mDATAL: case mDATAU:
 			cmd = "EX0812;";
+			get_trace(1, "get_DATA_sideband()");
 			wait_char(';', 8, FL891_WAIT_TIME, "GET DATA sideband", ASC);
-			p = replystr.find("EX");
-			if (p != std::string::npos) {
-				gett("");
-				return replystr[p+6] - '0';
-			}
 			break;
 		default: 
 			break;
 	}
 	gett("");
-	return 1;
+	p = replystr.rfind("EX");
+	if (p != std::string::npos) sb = replystr[p+6] - '0';
+	return sb;
 }
 
 void RIG_FT891::set_modeA(int val)
 {
-	modeA = val;
-
+	bool toggle = false;
 	if (inuse == onB) {
-		LOG_WARN("set_modeA, but on B.  Call selectA() first.");
-		return;
+		sendCommand("SV;");
+		toggle = true;
 	}
 
+	modeA = val;
 	adjust_bandwidth(modeA);
 
 	cmd = "MD0";
@@ -851,27 +903,30 @@ void RIG_FT891::set_modeA(int val)
 	showresp(WARN, ASC, "SET mode A", cmd, replystr);
 
 	set_sideband(modeA);
+
+	if (toggle) sendCommand("SV;");
 }
 
 int RIG_FT891::get_modeA()
 {
-	if (inuse == onB) {
-		//LOG_WARN("get_modeA, but on B.  Call selectA() first.");
-		return modeA;
-	}
+	if (inuse == onB) return modeA;
 
-	cmd = rsp = "MD0";
-	cmd += ';';
-	get_trace(1, "get_modeA()");
-	wait_char(';',5, FL891_WAIT_TIME, "get mode A", ASC);
+	cmd = "MD0;";
+	get_trace(1, __func__);
+	wait_char(';',5, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("MD");
 	if (p != std::string::npos) {
 		if (p + 3 < replystr.length()) {
 			int md = 0;
 			switch (replystr[p+3]) {
-				case '1': case '2': md = (get_sideband(mLSB) ? mLSB : mUSB); break;
+				case '1': case '2':
+					md = get_sideband(mLSB);
+					if (md == 0) md = mUSB;
+					else if (md == 1) md = mLSB;
+					else md = (freqA < 10000000 ? mLSB : mUSB);
+					break;
 				case '3': case '7': md = (get_sideband(mCW) ? mCWR : mCW); break;
 				case '6': case '9': md = (get_sideband(mTTYU) ? mTTYL : mTTYU); break;
 				case '8': case 'C': md = (get_sideband(mDATAU) ? mDATAL : mDATAU); break;
@@ -891,12 +946,13 @@ int RIG_FT891::get_modeA()
 
 void RIG_FT891::set_modeB(int val)
 {
-	modeB = val;
-
-	if (inuse == onB) {
-		LOG_WARN("set_modeB, but on A.  Call selectB() first.");
-		return;
+	bool toggle = false;
+	if (inuse == onA) {
+		sendCommand("SV;");
+		toggle = true;
 	}
+
+	modeB = val;
 
 	adjust_bandwidth(modeB);
 
@@ -904,33 +960,37 @@ void RIG_FT891::set_modeB(int val)
 	cmd += FT891_mode_chr[val];
 	cmd += ';';
 
-	set_trace(1, "set_modeB()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET mode B", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 
 	set_sideband(modeB);
+
+	if (toggle) sendCommand("SV;");
+
 }
 
 int RIG_FT891::get_modeB()
 {
-	if (inuse == onA) {
-		//LOG_WARN("set_modeB, but on A.  Call selectB() first.");
-		return modeB;
-	}
+	if (inuse == onA) return modeB;
 
-	cmd = rsp = "MD0";
-	cmd += ';';
-	get_trace(1, "get_modeB()");
-	wait_char(';',5, FL891_WAIT_TIME, "get mode B", ASC);
+	cmd = "MD0;";
+	get_trace(1, __func__);
+	wait_char(';',5, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("MD");
 	if (p != std::string::npos) {
 		if (p + 3 < replystr.length()) {
 			int md = 0;
 			switch (replystr[p+3]) {
-				case '1': case '2': md = (get_sideband(mLSB) ? mLSB : mUSB); break;
+				case '1': case '2':
+					md = get_sideband(mLSB);
+					if (md == 0) md = mUSB;
+					else if (md == 1) md = mLSB;
+					else md = (freqB < 10000000 ? mLSB : mUSB);
+					break;
 				case '3': case '7': md = (get_sideband(mCW) ? mCWR : mCW); break;
 				case '6': case '9': md = (get_sideband(mTTYU) ? mTTYL : mTTYU); break;
 				case '8': case 'C': md = (get_sideband(mDATAU) ? mDATAL : mDATAU); break;
@@ -944,141 +1004,159 @@ int RIG_FT891::get_modeB()
 	}
 
 	adjust_bandwidth(modeB);
+
 	return modeB;
 }
 
 void RIG_FT891::set_bwA(int val)
 {
-	bwA = val;
-
+	bool toggle = false;
 	if (inuse == onB) {
-		LOG_WARN("set_bwA, but on B.  Call selectA() first.");
-		return;
+		sendCommand("SV;");
+		toggle = true;
 	}
+
+	bwA = val;
 
 	int bw_indx = bw_vals_[val];
 
 	if (modeA == mFM || modeA == mAM || modeA == mFMN || modeA == mAMN) return;
+
+	set_trace(1, __func__);
+
 	cmd = "NA00;";
-	if ((((modeA == mLSB || modeA == mUSB) && val < 8)) ||
-		((modeA == mCW || modeA == mCWR ||
-		  modeA == mTTYL || modeA == mTTYU ||
-		  modeA == mDATAL || modeA == mDATAU) && val < 9) )
+	if ( ((modeA == mLSB || modeA == mUSB) && val <= 9) ||
+		 ((modeA == mCW || modeA == mCWR) && val <= 10) ||
+		 ((modeA == mTTYL || modeA == mTTYU) && val <= 10)  ||
+		 ((modeA == mDATAL || modeA == mDATAU) && val <= 9) )
 		cmd = "NA01;";
 
-	cmd.append("SH01");
+	sendCommand(cmd);
+	sett("");
+
+	cmd = "SH01";
 	cmd += '0' + bw_indx / 10;
 	cmd += '0' + bw_indx % 10;
 	cmd += ';';
 
-	set_trace(1, "set_bwA()");
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET bw A", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+
+	if (toggle) sendCommand("SV;");
+
 }
 
 int RIG_FT891::get_bwA()
 {
+	if (inuse == onB) return bwA;
+
 	size_t p;
-	if (inuse == onB) {
-		//LOG_WARN("get_bwA, but on B.  Call selectA() first.");
-		return bwA;
-	}
 
 	if (modeA == mFM || modeA == mAM || modeA == mFMN || modeA == mAMN) {
 		bwA = 0;
-		return bwA;
+	} else {
+
+		cmd = "SH0;";
+
+		get_trace(1, __func__);
+		wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
+		gett("");
+
+		p = replystr.rfind("SH0");
+		if (p == std::string::npos) return bwA;
+		if (p + 6 >= replystr.length()) return bwA;
+
+		char state = 0;
+		int filnbr = 0;
+		sscanf(&replystr[p], "SH0%c%d;", &state, &filnbr);
+
+		const int *idx = bw_vals_;
+		int i = 0;
+		while (*idx != WVALS_LIMIT) {
+			if (*idx == filnbr) break;
+			idx++;
+			i++;
+		}
+		if (*idx == WVALS_LIMIT) i--;
+		bwA = i;
 	}
-
-	cmd = rsp = "SH0";
-	cmd += ';';
-
-	get_trace(1, "get_bwA()");
-	wait_char(';',7, FL891_WAIT_TIME, "get bw A", ASC);
-	gett("");
-
-	p = replystr.rfind(rsp);
-	if (p == std::string::npos) return bwA;
-	if (p + 6 >= replystr.length()) return bwA;
-
-	replystr[p+6] = 0;
-	int bw_idx = fm_decimal(replystr.substr(p+4), 2);
-	const int *idx = bw_vals_;
-	int i = 0;
-	while (*idx != WVALS_LIMIT) {
-		if (*idx == bw_idx) break;
-		idx++;
-		i++;
-	}
-	if (*idx == WVALS_LIMIT) i--;
-	bwA = i;
 
 	return bwA;
 }
 
 void RIG_FT891::set_bwB(int val)
 {
-	bwB = val;
-
+	bool toggle = false;
 	if (inuse == onA) {
-		LOG_WARN("set_bwB, but on A.  Call selectB() first.");
-		return;
+		sendCommand("SV;");
+		toggle = true;
 	}
+
+	bwB = val;
 
 	int bw_indx = bw_vals_[val];
 
 	if (modeB == mFM || modeB == mAM || modeB == mFMN || modeB == mAMN) return;
+
+	set_trace(1, __func__);
+
 	cmd = "NA00;";
-	if ((((modeB == mLSB || modeB == mUSB) && val < 8)) ||
-		((modeB == mCW || modeB == mCWR ||
-		  modeB == mTTYL || modeB == mTTYU ||
-		  modeB == mDATAL || modeB == mDATAU) && val < 9) )
+	if ( ((modeB == mLSB || modeB == mUSB) && val <= 9) ||
+		 ((modeB == mCW || modeB == mCWR) && val <= 10) ||
+		 ((modeB == mTTYL || modeB == mTTYU) && val <= 10)  ||
+		 ((modeB == mDATAL || modeB == mDATAU) && val <= 9) )
 		cmd = "NA01;";
 
-	cmd.append("SH01");
+	sendCommand(cmd);
+	sett("");
+
+	cmd = "SH01";
 	cmd += '0' + bw_indx / 10;
 	cmd += '0' + bw_indx % 10;
 	cmd += ';';
 
-	set_trace(1, "set_bwB()");
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET bw B", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+
+	if (toggle) sendCommand("SV;");
+
 }
 
 int RIG_FT891::get_bwB()
 {
+	if (inuse == onA) return bwB;
+
 	size_t p;
-	if (inuse == onA) {
-		//LOG_WARN("get_bwB, but on A.  Call selectB() first.");
-		return bwB;
-	}
 
 	if (modeB == mFM || modeB == mAM || modeB == mFMN || modeB == mAMN) {
 		bwB = 0;
-		return bwB;
-	}
-	cmd = rsp = "SH0";
-	cmd += ';';
-	get_trace(1, "get_bwB()");
-	wait_char(';',7, FL891_WAIT_TIME, "get bw B", ASC);
-	gett("");
+	} else {
+		cmd = "SH0;";
+		get_trace(1, __func__);
+		wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
+		gett("");
 
-	p = replystr.rfind(rsp);
-	if (p == std::string::npos) return bwB;
-	if (p + 6 >= replystr.length()) return bwB;
+		p = replystr.rfind("SH");
+		if (p == std::string::npos) return bwB;
+		if (p + 6 >= replystr.length()) return bwB;
 
-	replystr[p+6] = 0;
-	int bw_idx = fm_decimal(replystr.substr(p+4), 2);
-	const int *idx = bw_vals_;
-	int i = 0;
-	while (*idx != WVALS_LIMIT) {
-		if (*idx == bw_idx) break;
-		idx++;
-		i++;
+		char state = 0;
+		int filnbr = 0;
+		sscanf(&replystr[p], "SH0%c%d;", &state, &filnbr);
+
+		const int *idx = bw_vals_;
+		int i = 0;
+		while (*idx != WVALS_LIMIT) {
+			if (*idx == filnbr) break;
+			idx++;
+			i++;
+		}
+		if (*idx == WVALS_LIMIT) i--;
+		bwB = i;
 	}
-	if (*idx == WVALS_LIMIT) i--;
-	bwB = i;
+
 	return bwB;
 }
 
@@ -1097,21 +1175,20 @@ void RIG_FT891::set_if_shift(int val)
 		cmd[4+i] += val % 10;
 		val /= 10;
 	}
-	set_trace(1, "set_if_shift()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET if shift", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 bool RIG_FT891::get_if_shift(int &val)
 {
-	cmd = rsp = "IS0";
-	cmd += ';';
-	get_trace(1, "get_if_shift()");
-	wait_char(';',10, FL891_WAIT_TIME, "get if shift", ASC);
+	cmd = "IS0;";
+	get_trace(1, __func__);
+	wait_char(';',10, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("IS");
 	val = progStatus.shift_val;
 	if (p == std::string::npos) return progStatus.shift;
 	val = atoi(&replystr[p+5]);
@@ -1124,10 +1201,10 @@ void RIG_FT891::set_notch(bool on, int val)
 // set notch frequency
 	if (on) {
 		cmd = "BP00001;";
-		set_trace(1, "set_notch ON");
+		set_trace(1, __func__);
 		sendCommand(cmd);
 		sett("");
-		showresp(WARN, ASC, "SET notch on", cmd, replystr);
+		showresp(WARN, ASC, __func__, cmd, replystr);
 		cmd = "BP01000;";
 		if (val % 10 >= 5) val += 10;
 		val /= 10;
@@ -1153,24 +1230,22 @@ void RIG_FT891::set_notch(bool on, int val)
 bool  RIG_FT891::get_notch(int &val)
 {
 	bool ison = false;
-	cmd = rsp = "BP00";
-	cmd += ';';
-	get_trace(1, "get_notch ON/OFF");
-	wait_char(';',8, FL891_WAIT_TIME, "get notch on/off", ASC);
+	cmd = "BP00;";
+	get_trace(1, __func__);
+	wait_char(';',8, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("BP");
 	if (p == std::string::npos) return ison;
 
 	if (replystr[p+6] == '1') { // manual notch enabled
 		ison = true;
 		val = progStatus.notch_val;
-		cmd = rsp = "BP01";
-		cmd += ';';
+		cmd = "BP01";
 		get_trace(1, "get notch value()");
 		wait_char(';',8, FL891_WAIT_TIME, "get notch val", ASC);
 		gett("");
-		p = replystr.rfind(rsp);
+		p = replystr.rfind("BP");
 		if (p == std::string::npos)
 			val = 10;
 		else
@@ -1182,17 +1257,17 @@ bool  RIG_FT891::get_notch(int &val)
 void RIG_FT891::set_auto_notch(int v)
 {
 	cmd.assign("BC0").append(v ? "1" : "0" ).append(";");
-	set_trace(1, "set auto notch");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET DNF Auto Notch Filter", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int  RIG_FT891::get_auto_notch()
 {
 	cmd = "BC0;";
-	get_trace(1, "get auto notch");
-	wait_char(';',5, FL891_WAIT_TIME, "get auto notch", ASC);
+	get_trace(1, __func__);
+	wait_char(';',5, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 	size_t p = replystr.rfind("BC0");
 	if (p == std::string::npos) return 0;
@@ -1204,17 +1279,17 @@ void RIG_FT891::set_noise(bool b)
 {
 	if (b) cmd = "NR01;";
 	else   cmd = "NR00;";
-	set_trace(1, "set_noise()");
+	set_trace(1, __func__);
 	sendCommand (cmd);
 	sett("");
-	showresp(WARN, ASC, "SET NR", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FT891::get_noise()
 {
 	cmd = "NR0;";
-	get_trace(1, "get_noise()");
-	wait_char(';',5, FL891_WAIT_TIME, "get NR", ASC);
+	get_trace(1, __func__);
+	wait_char(';',5, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
 	size_t p = replystr.rfind("NR0");
@@ -1229,17 +1304,17 @@ void RIG_FT891::set_nb_level(int val)
 		cmd[i] += val % 10;
 		val /= 10;
 	}
-	set_trace(1, "set_nb_level()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "set RL level", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FT891::get_nb_level() 
 { 
 	cmd = "RL0;";
-	get_trace(1, "get_nb_level()");
-	wait_char(';', 7, FL891_WAIT_TIME, "get RL level", ASC);
+	get_trace(1, __func__);
+	wait_char(';', 7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 	size_t p = replystr.rfind("RL0");
 	if (p == std::string::npos) return 0;
@@ -1252,17 +1327,17 @@ void RIG_FT891::set_noise_reduction(int val)
 {
 	if (val) cmd = "NB01;";
 	else     cmd = "NB00;";
-	set_trace(1, "set_noise_reduction()");
+	set_trace(1, __func__);
 	sendCommand (cmd);
 	sett("");
-	showresp(WARN, ASC, "Set NB on/off", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int  RIG_FT891::get_noise_reduction()
 {
 	cmd = "NB0;";
-	set_trace(1, "get_noise_reduction()");
-	wait_char(';', 5, FL891_WAIT_TIME, "get NB", ASC);
+	get_trace(1, __func__);
+	wait_char(';', 5, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
 	size_t p = replystr.rfind("NB0");
@@ -1277,17 +1352,17 @@ void RIG_FT891::set_noise_reduction_val(int val)
 		cmd[i] += val % 10;
 		val /= 10;
 	}
-	set_trace(1, "set_noise_reduction_val()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "set NB level", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int  RIG_FT891::get_noise_reduction_val()
 {
 	cmd = "NL0;";
-	get_trace(1, "get_noise_reduction_val()");
-	wait_char(';', 7, FL891_WAIT_TIME, "get NB level", ASC);
+	get_trace(1, __func__);
+	wait_char(';', 7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 	size_t p = replystr.rfind("NL0");
 	if (p == std::string::npos) return 0;
@@ -1304,21 +1379,20 @@ void RIG_FT891::set_mic_gain(int val)
 		cmd[i] = val % 10 + '0';
 		val /= 10;
 	}
-	set_trace(1, "set_mic_gain()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET mic", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FT891::get_mic_gain()
 {
-	cmd = rsp = "MG";
-	cmd += ';';
-	get_trace(1, "get_mic_gain()");
-	wait_char(';',6, FL891_WAIT_TIME, "get mic", ASC);
+	cmd = "MG;";
+	get_trace(1, __func__);
+	wait_char(';',6, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("MG");
 	if (p == std::string::npos) return progStatus.mic_gain;
 	int val = atoi(&replystr[p+2]);
 	if (val > 100) val = 100;
@@ -1333,22 +1407,21 @@ void RIG_FT891::set_rf_gain(int val)
 		val /= 10;
 	}
 
-	set_trace(1, "set_rf_gain()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET rfgain", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int  RIG_FT891::get_rf_gain()
 {
 	int rfval = 0;
-	cmd = rsp = "RG0";
-	cmd += ';';
-	get_trace(1, "get_rf_gain()");
-	wait_char(';',7, FL891_WAIT_TIME, "get rfgain", ASC);
+	cmd = "RG0;";
+	get_trace(1, __func__);
+	wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("RG");
 	if (p == std::string::npos) return progStatus.rfgain;
 	for (int i = 3; i < 6; i++) {
 		rfval *= 10;
@@ -1359,28 +1432,24 @@ int  RIG_FT891::get_rf_gain()
 
 void RIG_FT891::set_squelch(int val)
 {
-	cmd = "SQ0000;";
-	for (int i = 5; i > 2; i--) {
-		cmd[i] = val % 10 + '0';
-		val /= 10;
-	}
+	char cmdstr[] = "SQ0000;";
+	snprintf(cmdstr, sizeof(cmdstr), "SQ0%03d;", val);
 
-	set_trace(1, "set_squelch()");
-	sendCommand(cmd);
+	set_trace(1, __func__);
+	sendCommand(cmdstr);
 	sett("");
-	showresp(WARN, ASC, "SET squelch", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmdstr, replystr);
 }
 
 int  RIG_FT891::get_squelch()
 {
 	int rfval = 0;
-	cmd = rsp = "SQ0";
-	cmd += ';';
-	get_trace(1, "get_squelch()");
-	wait_char(';',7, FL891_WAIT_TIME, "get squelch", ASC);
+	cmd = "SQ0;";
+	get_trace(1, __func__);
+	wait_char(';',7, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("SQ");
 	if (p == std::string::npos) return progStatus.rfgain;
 	for (int i = 3; i < 6; i++) {
 		rfval *= 10;
@@ -1407,10 +1476,10 @@ void RIG_FT891::set_vox_onoff()
 {
 	cmd = "VX0;";
 	if (progStatus.vox_onoff) cmd[2] = '1';
-	set_trace(1, "set_vox_onoff()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET vox", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::set_vox_gain()
@@ -1420,10 +1489,10 @@ void RIG_FT891::set_vox_gain()
 	else
 		cmd = "VG";
 	cmd.append(to_decimal(progStatus.vox_gain, 3)).append(";");
-	set_trace(1, "set_vox_gain()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET vox gain", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::set_vox_anti()
@@ -1433,10 +1502,10 @@ void RIG_FT891::set_vox_anti()
 	else
 		cmd = "EX1619";
 	cmd.append(to_decimal(progStatus.vox_anti, 3)).append(";");
-	set_trace(1, "set_vox_anti()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET anti-vox", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::set_vox_hang()
@@ -1446,20 +1515,20 @@ void RIG_FT891::set_vox_hang()
 	else
 		cmd = "VD";
 	cmd.append(to_decimal(progStatus.vox_hang, 4)).append(";");
-	set_trace(1, "set_vox_hang()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET vox delay", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::set_vox_on_dataport()
 {
 	cmd = "EX16160;";
 	if (progStatus.vox_on_dataport) cmd[6] = '1';
-	set_trace(1, "set_vox_on_dataport()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET vox on data port", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::set_cw_wpm()
@@ -1468,10 +1537,43 @@ void RIG_FT891::set_cw_wpm()
 	if (progStatus.cw_wpm > 60) progStatus.cw_wpm = 60;
 	if (progStatus.cw_wpm < 4) progStatus.cw_wpm = 4;
 	cmd.append(to_decimal(progStatus.cw_wpm, 3)).append(";");
-	set_trace(1, "set_cw_wpm()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET cw wpm", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+}
+
+void RIG_FT891::set_cw_vol()
+{
+	if (progStatus.cw_vol == 0)
+		cmd = "ML0000;";
+	else {
+		char cmdstr[20];
+		snprintf(cmdstr, 19, "ML1%03d;", progStatus.cw_vol);
+		cmd = cmdstr;
+	}
+	set_trace(1, __func__);
+	sendCommand(cmd);
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
+}
+
+int  RIG_FT891::get_cw_vol()
+{
+	cmd = "ML1;";
+
+	get_trace(1, __func__);
+	wait_char(';', 7, FL891_WAIT_TIME, __func__, ASC);
+	gett("");
+	size_t p = replystr.rfind("ML");
+	if (p == std::string::npos) return progStatus.cw_vol;
+
+	char mon = 0;
+	int vol = 0;
+	sscanf( &replystr[p], "ML%c%d;", &mon, &vol );
+	if (mon == 0) vol = 0;
+	progStatus.cw_vol = vol;
+	return vol;
 }
 
 void RIG_FT891::enable_keyer()
@@ -1480,10 +1582,21 @@ void RIG_FT891::enable_keyer()
 		cmd = "KR1;";
 	else
 		cmd = "KR0;";
-	set_trace(1,"enable_keyer()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET keyer on/off", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+}
+
+int RIG_FT891::get_keyer()
+{
+	cmd = "KR;";
+	get_trace(1, __func__);
+	wait_char(';', 4, FL891_WAIT_TIME, __func__, ASC);
+	gett("");
+	size_t p = replystr.rfind("KR");
+	if (p != std::string::npos) return replystr[p+2] - '0';
+	return 0;
 }
 
 bool RIG_FT891::set_cw_spot()
@@ -1491,10 +1604,10 @@ bool RIG_FT891::set_cw_spot()
 	if (vfo->imode == mCW || vfo->imode == mCWR) {
 		cmd = "CS0;";
 		if (progStatus.spot_onoff) cmd[2] = '1';
-		set_trace(1, "set_cw_spot()");
+		set_trace(1, __func__);
 		sendCommand(cmd);
 		sett("");
-		showresp(WARN, ASC, "SET spot on/off", cmd, replystr);
+		showresp(WARN, ASC, __func__, cmd, replystr);
 		return true;
 	} else
 		return false;
@@ -1504,20 +1617,54 @@ void RIG_FT891::set_cw_weight()
 {
 	int n = round(progStatus.cw_weight * 10);
 	cmd.assign("EX0403").append(to_decimal(n, 2)).append(";");
-	set_trace(1, "set_cw_weight()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET cw weight", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FT891::set_cw_qsk()
 {
 	int n = progStatus.cw_qsk / 5 - 3;
 	cmd.assign("EX0713").append(to_decimal(n, 1)).append(";");
-	set_trace(1, "set_cw_qsk()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET cw qsk", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+}
+
+int  RIG_FT891::get_cw_qsk()
+{
+	cmd = "EX0713;";
+	get_trace(1, __func__);
+	wait_char(';', 8, FL891_WAIT_TIME, __func__, ASC);
+	gett("");
+	char delay = 0;
+	sscanf(replystr.c_str(), "EX0713%c;", &delay);
+	progStatus.cw_qsk = (delay + 3) * 5;
+	return progStatus.cw_qsk;
+}
+
+void RIG_FT891::set_cw_delay()
+{
+	int n = progStatus.cw_delay;
+	char szcmd[20] = "EX07090000;";
+	snprintf(szcmd, sizeof(szcmd), "EX0709%04d;", n);
+	cmd = szcmd;
+	set_trace(1, __func__);
+	sendCommand(cmd);
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
+}
+
+int  RIG_FT891::get_cw_delay()
+{
+	cmd = "EX0709;";
+	get_trace(1, __func__);
+	wait_char(';', 10, FL891_WAIT_TIME, __func__, ASC);
+	gett("");
+	sscanf(replystr.c_str(), "EX0709%lf;", &progStatus.cw_delay);
+	return progStatus.cw_delay;
 }
 
 // 00: 300 Hz to 75: 1050 Hz (10Hz steps)
@@ -1527,11 +1674,15 @@ void RIG_FT891::set_cw_spot_tone()
 	if (n < 0) n = 0;
 	if (n > 75) n = 75;
 	cmd.assign("KP").append(to_decimal(n, 2)).append(";");
-	set_trace(1, "set_cw_spot_tone()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "SET cw tone", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
+
+/*
+ * auto on/off not working well needs much work  !!!!!
+*/
 
 void RIG_FT891::set_xcvr_auto_on()
 {
@@ -1540,27 +1691,23 @@ void RIG_FT891::set_xcvr_auto_on()
 // This command requires dummy data be initially sent. Then after one
 // second and before two seconds the command is sent.
 
-	cmd = "IF;"; // use as the dummy data
+	cmd = "PS1;"; // use as the dummy data
 	sendCommand(cmd);
 	update_progress(0);
-	for (int i = 0; i < 1500; i += 100) {
+	for (int i = 0; i < 1200; i += 100) {
 		MilliSleep(100);
 		update_progress(100 * i / 6000);
 		Fl::awake();
 	}
 
-	cmd = rsp = "PS";
-	cmd.append(";");
+	cmd = "PS;";
 	get_trace(1, "xcvr ON? ()");
 	wait_char(';',4, 500, "Test: Is Rig ON", ASC);
 	gett("");
 
-	int powerstat;
-	if(sscanf(replystr.c_str(),"PS%d", &powerstat)) {
-		if (powerstat != 0) {
-			update_progress(0);
-			return;
-		}
+	if (replystr.find("PS1;") != std::string::npos) {
+		update_progress(0);
+		return;
 	}
 
 	cmd = "PS1;";
@@ -1586,14 +1733,15 @@ void RIG_FT891::set_xcvr_auto_off()
 	showresp(WARN, ASC, "SET xcvr auto on/off", cmd, replystr);
 }
 
+
 void RIG_FT891::set_compression(int on, int val)
 {
 	cmd = "PL";
 	cmd.append(to_decimal(val, 3)).append(";");
-	set_trace(1, "set_compression()");
+	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
-	showresp(WARN, ASC, "set Comp PL", cmd, replystr);
+	showresp(WARN, ASC, __func__, cmd, replystr);
 
 	// Can only send PR command in SSB mode.  Other modes will cause 891 to
 	// return ?; in response to sending this
@@ -1615,13 +1763,12 @@ void RIG_FT891::get_compression(int &on, int &val)
 { 
 	on = 0; val = 0;
 
-	cmd = rsp = "PL";
-	cmd += ';';
-	get_trace(1, "get_compression()");
-	wait_char(';',6, FL891_WAIT_TIME, "get Comp PL", ASC);
+	cmd = "PL;";
+	get_trace(1, __func__);
+	wait_char(';',6, FL891_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = replystr.rfind("PL");
 	if (p == std::string::npos) return;
 	val = atoi(&replystr[p+2]);
 	if (val > 100) val = 100;
@@ -1651,10 +1798,110 @@ void RIG_FT891::get_band_selection(int v)
 {
 	if (v < 3) v = v - 1;
 	cmd.assign("BS").append(to_decimal(v, 2)).append(";");
-	get_trace(1, "get_band_selection()");
+	get_trace(1, __func__);
 	sendCommand(cmd);
 	gett("");
-	showresp(WARN, ASC, "Select Band Stacks", cmd, replystr);
-	set_trace(2, "get band", cmd.c_str());
+	showresp(WARN, ASC, __func__, cmd, replystr);
+	get_trace(2, "get band", cmd.c_str());
+}
+
+void RIG_FT891::setVfoAdj(double v)
+{
+	char cmdstr[20];
+	set_trace(1, __func__);
+	snprintf(cmdstr, sizeof(cmdstr), "EX0517%-2d;", (int)v);
+	sett("");
+	cmd = cmdstr;
+	sendCommand(cmd);
+	set_trace(3, __func__, cmd.c_str(), replystr.c_str());
+}
+
+double RIG_FT891::getVfoAdj()
+{
+// response: EX0517+25;
+	cmd = rsp = "EX0517";
+	get_trace(1, __func__);
+	sendCommand(cmd.append(";"));
+	wait_char(';', 10, FL891_WAIT_TIME, __func__, ASC);
+	gett("");
+	size_t p = replystr.rfind(rsp);
+	if (p == std::string::npos) return 0;
+	return (double)(atoi(&replystr[p+6]));
+}
+
+void RIG_FT891::get_vfoadj_min_max_step(double &min, double &max, double &step)
+{
+	min = -25;
+	max = 25;
+	step = 1;
+}
+
+//----------------------------------------------------------------------
+// AGC control
+//----------------------------------------------------------------------
+
+int  RIG_FT891::get_agc()
+{
+	cmd = "GT0;";
+	wait_char(';', 6, FL891_WAIT_TIME, __func__, ASC);
+	gett(__func__);
+
+	size_t p = replystr.rfind("GT");
+	if (p == std::string::npos) return agcval;
+
+	switch (replystr[3]) {
+		default:
+		case '0': agcval = 0; break;
+		case '1': agcval = 1; break;
+		case '2': agcval = 2; break;
+		case '3': agcval = 3; break;
+		case '4': case '5':
+		case '6': agcval = 4; break;
+	}
+	return agcval;
+}
+
+int RIG_FT891::incr_agc()
+{
+static const char ch[] = {'0', '1', '2', '3', '4'};
+	agcval++;
+	if (agcval > 4) agcval = 0;
+	cmd = "GT00;";
+	cmd[3] = ch[agcval];
+
+	sendCommand(cmd);
+	showresp(WARN, ASC, __func__, cmd, replystr);
+	sett(__func__);
+
+	return agcval;
+}
+
+
+static const char *agcstr[] = {"AGC", "FST", "MED", "SLO", "AUT"};
+const char *RIG_FT891::agc_label()
+{
+	if (agcval < 0 || agcval > 4) return "AGC";
+	return agcstr[agcval];
+}
+
+int  RIG_FT891::agc_val()
+{
+	return (agcval);
+}
+ 
+void  RIG_FT891::zero_in()
+{
+	sendCommand("ZI;");
+}
+
+const char * RIG_FT891::get_bwname_(int bw, int md) {
+// read bw based on mode
+	try {
+		std::string sbw = bwtable(md).at(bw);
+		return (bwtable(md).at(bw)).c_str();
+	} catch (const std::exception& e) {
+		LOG_ERROR("%s", e.what());
+	}
+	return "";
 }
 

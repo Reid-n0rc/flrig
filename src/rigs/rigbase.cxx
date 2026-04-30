@@ -892,7 +892,7 @@ bool rigbase::id_OK(std::string ID, int wait)
 				replystr.append(buff);
 				tout = zmsec() + wait;
 			}
-			if (replystr.rfind(ID)) {
+			if (replystr.rfind(ID) != std::string::npos) {
 				return true;
 			}
 			Fl::awake();

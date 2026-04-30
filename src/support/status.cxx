@@ -193,6 +193,10 @@ status progStatus = {
 	0,			// double  power_level;
 	100,		// double power_limit;
 	false,		// bool enable_power_limit
+	10,			// int  tune_percent_power
+	5,			// int  tune_seconds
+	false,		// bool enable_AM_tune
+
 	10,			// int  mic_gain;
 	false,		// bool notch;
 	0,			// int  notch_val;
@@ -1194,6 +1198,10 @@ void status::saveLastState()
 	spref.set("dbl_power", power_level);
 	spref.set("power_limit", power_limit);
 	spref.set("enable_power_limit", enable_power_limit);
+
+	spref.set("tune_percent_power", tune_percent_power);
+	spref.set("enable_AM_tune", enable_AM_tune);
+
 	spref.set("int_mic", mic_gain);
 	spref.set("bool_notch", notch);
 	spref.set("int_notch", notch_val);
@@ -1903,6 +1911,10 @@ bool status::loadXcvrState(std::string xcvr)
 		spref.get("dbl_power", power_level, power_level);
 		spref.get("power_limit", power_limit, power_limit);
 		if (spref.get("enable_power_limit", i, i)) enable_power_limit = i;
+
+		spref.get("tune_percent_power", tune_percent_power, tune_percent_power);
+		if (spref.get("enable_AM_tune", i, i)) enable_AM_tune = i;
+
 		spref.get("int_mic", mic_gain, mic_gain);
 		if (spref.get("bool_notch", i, i)) notch = i;
 		spref.get("int_notch", notch_val, notch_val);
@@ -2323,7 +2335,7 @@ bool status::loadXcvrState(std::string xcvr)
 		if (spref.get("startstoptrace", i, start_stop_trace)) start_stop_trace = i;
 		if (spref.get("rpctrace", i, rpctrace)) rpctrace = i;
 		if (spref.get("tcitrace", i, tcitrace)) tcitrace = i;
-
+/*
 #ifndef NDEBUG
 		trace = true;
 		rigtrace = true;
@@ -2336,7 +2348,7 @@ bool status::loadXcvrState(std::string xcvr)
 		gettrace = true;
 		tcitrace = true;
 #endif
-
+*/
 		spref.get("rpc_level", rpc_level, rpc_level);
 
 		spref.get("f160", f160, f160); spref.get("m160", m160, m160);
@@ -2804,6 +2816,8 @@ std::string status::info()
 	info << "dbl_power          : " << power_level << "\n";
 	info << "dbl_power_limit %  : " << power_limit << "\n";
 	info << "enable power limit:  " << enable_power_limit << "\n";
+	info << "percent full power: " << tune_percent_power << "\n";
+	info << "enable cw tune: " << enable_AM_tune << "\n";
 	info << "int_mic            : " << mic_gain << "\n";
 	info << "bool_notch         : " << notch << "\n";
 	info << "int_notch          : " << notch_val << "\n";
@@ -2909,6 +2923,7 @@ static bool ssettrace;
 static bool sgettrace;
 static bool sstrace;
 static bool stcitrace;
+static bool slocktrace;
 
 void ss_trace(bool on)
 {
@@ -2919,12 +2934,13 @@ void ss_trace(bool on)
 		sgettrace = progStatus.gettrace;
 		sstrace   = progStatus.serialtrace;
 		stcitrace = progStatus.tcitrace;
+		slocktrace = progStatus.locktrace;
 
 		progStatus.trace =
 		progStatus.rigtrace =
 		progStatus.settrace =
 		progStatus.serialtrace =
-		progStatus.locktrace =
+//		progStatus.locktrace =
 		progStatus.gettrace = 
 		progStatus.tcitrace = true;
 	} else {
@@ -2933,7 +2949,7 @@ void ss_trace(bool on)
 		progStatus.settrace = ssettrace;
 		progStatus.gettrace = sgettrace;
 		progStatus.serialtrace = sstrace;
-		progStatus.locktrace = sstrace;
+//		progStatus.locktrace = slocktrace;
 		progStatus.tcitrace = stcitrace;
 	}
 }

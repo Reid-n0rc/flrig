@@ -851,6 +851,7 @@ void TRACED(init_Generic_Tabs)
 
 		if (selrig->has_cw_keyer) {
 			btn_enable_keyer->show();
+			progStatus.enable_keyer = selrig->get_keyer();
 			btn_enable_keyer->value(progStatus.enable_keyer);
 			selrig->enable_keyer();
 		}
@@ -893,10 +894,25 @@ void TRACED(init_Generic_Tabs)
 		genericCW->show();
 	}
 
-	if (selrig->has_cw_qsk) {
+	if (selrig->has_cw_break_in || selrig->has_cw_delay || selrig->has_cw_qsk) {
 
-		btnBreakIn->show();
-		spnr_cw_delay->show();
+		btnBreakIn->hide();
+		spnr_cw_qsk->hide();
+		spnr_cw_delay->hide();
+
+		if (selrig->has_cw_break_in)
+			btnBreakIn->show();
+
+		if (selrig->has_cw_delay) {
+			double min, max, step;
+			selrig->get_cw_delay_min_max_step(min, max, step);
+			spnr_cw_delay->minimum(min);
+			spnr_cw_delay->maximum(max);
+			spnr_cw_delay->step(step);
+			progStatus.cw_delay = selrig->get_cw_delay();
+			spnr_cw_qsk->value(progStatus.cw_delay);
+			spnr_cw_delay->show();
+		}
 
 		if (selrig->has_cw_qsk) {
 			double min, max, step;
@@ -904,10 +920,10 @@ void TRACED(init_Generic_Tabs)
 			spnr_cw_qsk->minimum(min);
 			spnr_cw_qsk->maximum(max);
 			spnr_cw_qsk->step(step);
+			progStatus.cw_qsk = selrig->get_cw_qsk();
 			spnr_cw_qsk->value(progStatus.cw_qsk);
 			spnr_cw_qsk->show();
-		} else
-			spnr_cw_qsk->hide();
+		}
 
 		tabsGeneric->add(genericQSK);
 		genericQSK->redraw();

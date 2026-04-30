@@ -176,6 +176,10 @@ struct status {
 	double	power_level;
 	double	power_limit;
 	bool	enable_power_limit;
+	int 	tune_percent_power;
+	int		tune_seconds;
+	bool	enable_AM_tune;
+
 	int		mic_gain;
 	bool	notch;
 	int		notch_val;

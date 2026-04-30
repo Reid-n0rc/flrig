@@ -708,14 +708,17 @@ double vfo_;
 	virtual void get_cw_wpm_min_max(int &min, int &max) {
 		min = 5; max = 50; } // default for FT950/FT450D
 	virtual void enable_keyer() {}
+	virtual int  get_keyer() {return 0;}
 	virtual void set_break_in() {}
 	virtual int  get_break_in() {return 0;}
 
 	virtual void set_cw_qsk() {}
+	virtual int  get_cw_qsk() { return progStatus.cw_qsk; }
 	virtual void get_cw_qsk_min_max_step(double &min, double &max, double &step) {
 		min = 15; max = 30; step = 5; } // default for FT950/FT450D
 
 	virtual void set_cw_delay() {}
+	virtual int  get_cw_delay() { return progStatus.cw_delay; }
 	virtual void get_cw_delay_min_max_step(double &min, double &max, double &step) {
 		min = 30; max = 3000; step = 10; } // default for FT950/FT450D
 

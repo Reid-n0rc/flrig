@@ -59,15 +59,14 @@ void Fl_SigBar::draw()
 	int SigBar; 
 	int PeakPos;
 
-
 // Draw the SigBar bar...
 // Draw the box and label...
 	if (horiz == true) {
 		int tx, tw;	 // Temporary X + width
 		tx = x() + bx;
 		tw = w() - bw;
-		SigBar = (int)(tw * (value_ - minimum_) / (maximum_ - minimum_) + 0.5f);
-		PeakPos = (int)(tw * (peakv_ - minimum_) / (maximum_ - minimum_) + 0.5f);
+		SigBar = (int)((tw * (value_ - minimum_) / (maximum_ - minimum_) + 0.5f));
+		PeakPos = (int)((tw * (peakv_ - minimum_) / (maximum_ - minimum_) + 0.5f));
 		if (SigBar > 0 ) { //|| PeakPos > 0) {
 
 			fl_clip(x(), y(), SigBar + bx, h());
@@ -130,19 +129,21 @@ Fl_SigBar::Fl_SigBar(int X, int Y, int W, int H, const char* l)
 void Fl_SigBar::value( double v )
 {
 	peakv_ = v;
-	value_ = 0;
+	double val = 0;
 	for (int i = 1; i < SIGBAR_ARRAY_SIZE; i++) {
 		vals_[i-1] = vals_[i];
 	}
 	vals_[SIGBAR_ARRAY_SIZE - 1] = v;
 
 	for (int i = SIGBAR_ARRAY_SIZE - avg_; i < SIGBAR_ARRAY_SIZE; i++)
-		value_ += vals_[i];
-	value_ /= avg_;
+		val += vals_[i];
+	val /= avg_;
 
 	for (int i = SIGBAR_ARRAY_SIZE - aging_; i < SIGBAR_ARRAY_SIZE; i++)
 		if (peakv_ < vals_[i]) peakv_ = vals_[i];
+	value_ = val;
 
+	redraw();
 };
 
 //
