@@ -2584,13 +2584,10 @@ trace(1, "selrig->initialize()");
 	if (!testmode && xcvr_name != rig_null.name_ && (progStatus.xcvr_serial_port != "xml_client")) {
 		trace(1, "selrig->check()");
 		if (!selrig->check()) {
-std::cout << "check 1" << std::endl;
 			MilliSleep(500);
 			if (!selrig->check()) {
-std::cout << "check 2" << std::endl;
-				MilliSleep(1000);
+				MilliSleep(500);
 				if (!selrig->check()) {
-std::cout << "check 3 failed" << std::endl;
 					trace(1, "FAILED");
 					bypass_serial_thread_loop = true;
 

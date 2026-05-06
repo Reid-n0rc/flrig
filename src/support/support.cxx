@@ -1262,7 +1262,6 @@ void check_ptt()
 	}
 	PTT = ptt_state();
 	xml_A.update_ptt(PTT);
-	Fl::awake(set_ptt, (void *)PTT);
 }
 
 void check_break_in()
@@ -1840,8 +1839,7 @@ extern bool xmlrpc_pending;
 
 //		if (progStatus.poll_ptt) {
 		{
-			guard_lock lk( &mutex_serial,
-				std::string(__func__).append(" ").append("ptt"));
+			guard_lock lk( &mutex_serial, std::string(__func__).append(" ").append("ptt"));
 			check_ptt();
 		}
 		if (xmlrpc_pending) goto serial_bypass_loop;
@@ -3750,9 +3748,6 @@ int chkptt()
 void doPTT(int on)
 {
 	guard_lock serlck( &mutex_serial, std::string(__func__) );
-
-//	int chk = chkptt();
-//	if (chk == on) return;
 
 	PTT = on;
 	rigPTT(on);
