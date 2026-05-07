@@ -44,7 +44,7 @@
 #include <FL/fl_show_colormap.H>
 #include <FL/fl_ask.H>
 
-#define TOD_STALE 500 // 0,5 seconds
+extern int TOD_STALE;
 
 struct XML_DATA {
 	unsigned long long int  freq;
@@ -59,8 +59,8 @@ struct XML_DATA {
 	unsigned long long int tod;
 
 	XML_DATA() {
-		freq = mode = bw = 0;
-		freq_tod = mode_tod = bw_tod = zmsec();
+		ptt = freq = mode = bw = 0;
+		ptt_tod = freq_tod = mode_tod = bw_tod = zmsec();
 	}
 	~XML_DATA() {};
 
@@ -69,7 +69,7 @@ struct XML_DATA {
 		freq_tod = zmsec();
 	}
 	bool freq_stale() {
-		return (zmsec() - freq_tod) > TOD_STALE;
+		return int(zmsec() - freq_tod) > TOD_STALE;
 	}
 
 	void update_mode(int md) {
@@ -77,7 +77,7 @@ struct XML_DATA {
 		mode_tod = zmsec();
 	}
 	bool mode_stale() {
-		return (zmsec() - mode_tod) > TOD_STALE;
+		return int(zmsec() - mode_tod) > TOD_STALE;
 	}
 
 	void update_bw(int val) {
@@ -85,7 +85,15 @@ struct XML_DATA {
 		bw_tod = zmsec();
 	}
 	bool bw_stale() {
-		return (zmsec() - bw_tod) > TOD_STALE;
+		return int(zmsec() - bw_tod) > TOD_STALE;
+	}
+
+	void update_ptt(int val) {
+		ptt = val;
+		ptt_tod = zmsec();
+	}
+	bool ptt_stale() {
+		return int(zmsec() - ptt_tod) > TOD_STALE;
 	}
 
 	void update(unsigned long long int f, int md, int val) {

@@ -804,6 +804,7 @@ static void cb_btnSplit(Fl_Light_Button* o, void*) {
 extern void doPTT(int);
 static void cb_btnPTT(Fl_Light_Button *b, void*)
 {
+std::cout << "PTT " << (b->value() ? "ON" : "OFF") << std::endl;
 	doPTT(b->value());
 }
 

@@ -58,6 +58,7 @@ bool xmlrpc_pending = false;
 
 XML_DATA xml_A;
 XML_DATA xml_B;
+int TOD_STALE  = 200; // 0.2 seconds
 
 using namespace XmlRpc;
 
@@ -302,7 +303,7 @@ public:
 // Request for PTT state
 //------------------------------------------------------------------------------
 class rig_get_ptt : public XmlRpcServerMethod {
-	bool lastptt = false;
+//	bool lastptt = false;
 public:
 	rig_get_ptt(XmlRpcServer* s) : XmlRpcServerMethod("rig.get_ptt", s) {}
 
@@ -316,7 +317,6 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.get_ptt ";
 
 		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml get_ptt");
@@ -337,6 +337,7 @@ public:
 	std::string help() { return std::string("returns state of PTT"); }
 
 } rig_get_ptt(&rig_server);
+
 
 //------------------------------------------------------------------------------
 // Request for split state
@@ -379,6 +380,14 @@ public:
 			return;
 		}
 
+		std::stringstream s;
+		unsigned long int t0 = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+
 		static char szfreq[20];
 		unsigned long long freq;
 
@@ -395,7 +404,9 @@ public:
 		snprintf(szfreq, sizeof(szfreq), "%llu", freq);
 		std::string result_string = szfreq;
 
-//		xml_trace(2, "rig_get_vfo ", szfreq);
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " rig.get_vfo " << szfreq;
+		xml_trace(1, s.str().c_str());
 
 		result = result_string;
 	}
@@ -420,14 +431,12 @@ public:
 		}
 
 		std::stringstream s;
-		long start = zmsec();
+		unsigned long int t0 = zmsec();
+
 		s << ztime();
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.get_vfoA ";
-
-		s << " @ " << ztime();
 
 		if ( xml_A.freq_stale() ) {
 
@@ -442,8 +451,9 @@ public:
 
 		}
 
-		s << ": " << vfoA.freq << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " rig.get_vfoA " << xml_A.freq;
+		xml_trace(1, s.str().c_str());
 
 		static char szfreq[20];
 		snprintf(szfreq, sizeof(szfreq), "%llu", xml_A.freq);
@@ -470,15 +480,14 @@ public:
 			result = "14070000";
 			return;
 		}
+
 		std::stringstream s;
-		long start = zmsec();
+		unsigned long int t0 = zmsec();
+
 		s << ztime();
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.get_vfoB ";
-
-		s << " @ " << ztime();
 
 		if ( xml_B.freq_stale() ) {
 
@@ -492,8 +501,9 @@ public:
 			Fl::awake(setFreqDispB);
 		}
 
-		s << ": " << vfoB.freq << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " rig.get_vfoB " << xml_B.freq;
+		xml_trace(1, s.str().c_str());
 
 		static char szfreq[20];
 		snprintf(szfreq, sizeof(szfreq), "%llu", xml_B.freq);
@@ -517,17 +527,22 @@ public:
 		void execute(XmlRpcValue& params, XmlRpcValue& result) { 
 		Fl::awake(connection_ON);
 
+		std::stringstream s;
+		unsigned long int t0 = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+
 		if (!xcvr_online || disable_xmlrpc->value()) {
 			result = "A";
-			return;
+		} else {
+			result = (selrig->inuse == onB) ? "B" : "A";
 		}
-
-//		xmlrpc_pending = true;
-//		guard_lock serial(&mutex_serial, "xml get AB");
-//		xmlrpc_pending = false;
-
-		xml_trace(2, "rig_get_AB: " , ((selrig->inuse == onB) ? "B" : "A"));
-		result = (selrig->inuse == onB) ? "B" : "A";
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " rig_get_AB " << ((selrig->inuse == onB) ? "B" : "A");
+		xml_trace(1, s.str().c_str());
 	}
 
 	std::string help() { return std::string("returns vfo in use A or B"); }
@@ -1074,15 +1089,24 @@ public:
 
 		int mode;
 
+		std::stringstream s;
+		s << ztime();
+		unsigned int long t0 = zmsec();
+
 		try {
-			std::stringstream s;
 			mode = vfo->imode;
 			std::string result_string = "none";
 			result_string = selrig->modes_.at(mode);
-			s << ztime() << ": rig.get_mode: " << result_string;
-			test_trace(1, s.str().c_str());
+
+#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+#endif
+			s << " [ " << zmsec() - t0 << " msec ]";
+			s <<  " rig.get_mode " << result_string;
 			xml_trace(1, s.str().c_str());
+
 			result = result_string;
+
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());
 			result = "USB";
@@ -1109,6 +1133,10 @@ public:
 			return;
 		}
 
+		std::stringstream s;
+		s << ztime();
+		unsigned int long t0 = zmsec();
+
 		try {
 
 			if (xml_A.mode_stale()) {
@@ -1119,12 +1147,15 @@ public:
 				vfoA.imode = selrig->get_modeA();
 				xml_A.update_mode(vfoA.imode);
 			}
+
 			std::string result_string = "none";
 			result_string = selrig->modes_.at(xml_A.mode);
 
-			std::stringstream s;
-			s << ztime() << ": rig.get_modeA: (" << xml_A.mode << ") "  << result_string;
-			test_trace(1, s.str().c_str());
+#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+#endif
+			s << " [ " << zmsec() - t0 << " msec ]";
+			s <<  " rig.get_modeA " << result_string;
 			xml_trace(1, s.str().c_str());
 
 			result = result_string;
@@ -1155,6 +1186,10 @@ public:
 			return;
 		}
 
+		std::stringstream s;
+		s << ztime();
+		unsigned int long t0 = zmsec();
+
 		try {
 			if (xml_B.mode_stale()) {
 				xmlrpc_pending = true;
@@ -1167,9 +1202,11 @@ public:
 			std::string result_string = "none";
 			result_string = selrig->modes_.at(xml_B.mode);
 
-			std::stringstream s;
-			s << ztime() << ": rig.get_modeB: (" << xml_B.mode << ") " << result_string;
-			test_trace(1, s.str().c_str());
+#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+#endif
+			s << " [ " << zmsec() - t0 << " msec ]";
+			s <<  " rig.get_modeB " << result_string;
 			xml_trace(1, s.str().c_str());
 
 			result = result_string;
@@ -1272,27 +1309,40 @@ public:
 
 		if (!xcvr_online || disable_xmlrpc->value()) return;
 
+		std::stringstream s;
+		s << ztime();
+		unsigned int long t0 = zmsec();
+
 		int BW = 0, mode = 0;
 		if (selrig->inuse == onB) {
 
-			xmlrpc_pending = true;
-			guard_lock serial_lock (&mutex_serial, "xml rig get bw");
-			xmlrpc_pending = false;
+			BW = vfoB.iBW;
+			mode = vfoB.imode;
+			if ( xml_B.bw_stale() ) {
+				xmlrpc_pending = true;
+				guard_lock serial_lock (&mutex_serial, "xml rig get bw");
+				xmlrpc_pending = false;
 
-			mode = selrig->get_modeB();
-			BW = selrig->get_bwB();
+				mode = vfoB.imode = selrig->get_modeB();
+				BW = vfoB.iBW = selrig->get_bwB();
+				xml_B.update_mode(mode);
+				xml_B.update_bw(BW);
+			}
 		} else {
+			BW = vfoA.iBW;
+			mode = vfoA.imode;
+			if ( xml_A.bw_stale() ) {
+				xmlrpc_pending = true;
+				guard_lock serial_lock (&mutex_serial, "xml rig get bw");
+				xmlrpc_pending = false;
 
-			xmlrpc_pending = true;
-			guard_lock serial_lock (&mutex_serial, "xml rig get bw");
-			xmlrpc_pending = false;
-
-			mode = selrig->get_modeA();
-			BW = selrig->get_bwA();
+				mode = vfoA.imode = selrig->get_modeA();
+				BW = vfoA.iBW = selrig->get_bwA();
+				xml_A.update_mode(mode);
+				xml_A.update_bw(BW);
+			}
 		}
 		try {
-// guard lock not need, serial port not accessed
-//			guard_lock serial_lock(&mutex_serial, "xml rig_get_bw");
 
 			if (!selrig->has_bandwidth_control)
 				return;
@@ -1312,8 +1362,17 @@ public:
 			LOG_ERROR("%s", e.what());
 			result[0] = result[1] = "";
 		}
+
 		std::string s1 = result[0], s2 = result[1];
-		xml_trace( 5, "bandwidth on ", ((selrig->inuse == onB) ? "B " : "A "), s1.c_str(), " | ", s2.c_str());
+
+#ifdef HAS_XMLRPC_CLIENT_ID
+		s << " [" << XmlRpc::client_id << "]";
+#endif
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " bandwidth on " << ((selrig->inuse == onB) ? "B " : "A ");
+		s << s1;
+		if (!s2.empty()) s << " | " << s2;
+		xml_trace( 1, s.str().c_str() );
 	}
 
 	std::string help() { return std::string("returns current bw L/U value"); }
@@ -1338,6 +1397,10 @@ public:
 		if (!xcvr_online || disable_xmlrpc->value()) return;
 		if (!selrig->has_bandwidth_control) return;
 
+		std::stringstream s;
+		s << ztime();
+		unsigned int long t0 = zmsec();
+
 		try {
 			int BW = xml_A.bw;
 			int mode = xml_A.mode;
@@ -1358,7 +1421,15 @@ public:
 			result[0] = result[1] = "";
 		}
 		std::string s1 = result[0], s2 = result[1];
-		xml_trace( 4, "bandwidth on A", s1.c_str(), " | ", s2.c_str());
+
+#ifdef HAS_XMLRPC_CLIENT_ID
+		s << " [" << XmlRpc::client_id << "]";
+#endif
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " bandwidth on A";
+		s << s1;
+		if (!s2.empty()) s << " | " << s2;
+		xml_trace( 1, s.str().c_str() );
 	}
 
 	std::string help() { return std::string("returns current bw L/U value"); }
@@ -1384,6 +1455,10 @@ public:
 		if (!xcvr_online || disable_xmlrpc->value()) return;
 		if (!selrig->has_bandwidth_control) return;
 
+		std::stringstream s;
+		s << ztime();
+		unsigned int long t0 = zmsec();
+
 		try {
 			int BW = xml_B.bw;
 			int mode = xml_B.mode;
@@ -1404,7 +1479,15 @@ public:
 			result[0] = result[1] = "";
 		}
 		std::string s1 = result[0], s2 = result[1];
-		xml_trace( 4, "bandwidth on B", s1.c_str(), " | ", s2.c_str());
+
+#ifdef HAS_XMLRPC_CLIENT_ID
+		s << " [" << XmlRpc::client_id << "]";
+#endif
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " bandwidth on B";
+		s << s1;
+		if (!s2.empty()) s << " | " << s2;
+		xml_trace( 1, s.str().c_str() );
 	}
 
 	std::string help() { return std::string("returns current bw L/U value"); }
@@ -1418,16 +1501,30 @@ public:
 		void execute(XmlRpcValue& params, XmlRpcValue& result) { 
 		Fl::awake(connection_ON);
 
+		std::stringstream s;
+		std::string result_string;
+		unsigned long int t0 = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+
 		if ( !xcvr_online           || disable_xmlrpc->value() 
 			 || !selrig->has_smeter || btnPTT->value() )
-			result = "0";
+			result_string = "0";
 		else {
 			char szMeter[20];
 			snprintf(szMeter, sizeof(szMeter), "%d", int(smtrval));
-			std::string result_string = szMeter;
-			result = result_string;
-			xml_trace(2, "smeter: ", result_string.c_str());
+			result_string = szMeter;
 		}
+		result = result_string;
+#ifdef HAS_XMLRPC_CLIENT_ID
+		s << " [" << XmlRpc::client_id << "]";
+#endif
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " smeter " << result_string;
+		xml_trace( 1, s.str().c_str() );
 	}
 
 	std::string help() { return std::string("returns S-meter reading"); }
@@ -1796,9 +1893,7 @@ public:
 		s << ztime() << " rig.set_verify_ptt " << (PTT ? "ON " : "OFF ");
 
 		xmlrpc_pending = true;
-
 		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
-
 		xmlrpc_pending = false;
 
 		s << " @ " << ztime();
@@ -1816,7 +1911,6 @@ public:
 
 			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
 			xml_trace(1, s.str().c_str());
-			test_trace(1, s.str().c_str());
 
 			Fl::awake(update_UI_PTT);
 		}
@@ -1847,19 +1941,17 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
 
 		xmlrpc_pending = true;
-
 		guard_lock ser_lock (&mutex_serial, "xml set ptt");
-
 		xmlrpc_pending = false;
 
 		s << " @ " << ztime();
 
 		rigPTT(PTT);
 
-		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		s << " [ " << zmsec() - start << " msec ]";
+		s << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
 		xml_trace(1, s.str().c_str());
 		test_trace(1, s.str().c_str());
 
@@ -1893,9 +1985,7 @@ public:
 		s << " rig.set_ptt_fast " << (PTT ? "ON " : "OFF ");
 
 		xmlrpc_pending = true;
-
 		guard_lock ser_lock (&mutex_serial, "xml set ptt fast");
-
 		xmlrpc_pending = false;
 
 		s << " @ " << ztime();
@@ -1904,7 +1994,6 @@ public:
 
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
 		xml_trace(1, s.str().c_str());
-		test_trace(1, s.str().c_str());
 
 		Fl::awake(update_UI_PTT);
 	}
@@ -2186,12 +2275,12 @@ public:
 				vfoA.freq = freq;
 				selrig->set_vfoA(vfoA.freq);
 			}
-
+			xml_A.update_freq(vfoA.freq);
 			Fl::awake(setFreqDispA);
 		}
 
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		xml_trace(1, s.str().c_str());
 
 	}
 	std::string help() { return std::string("rig.set_vfo NNNNNNNN (Hz)"); }
@@ -2237,9 +2326,9 @@ public:
 				selrig->set_vfoA(freq);
 				vfoA.freq = selrig->get_vfoA();
 			}
-
+			xml_A.update_freq(vfoA.freq);
 			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-			test_trace(1, s.str().c_str());
+			xml_trace(1, s.str().c_str());
 
 			Fl::awake(setFreqDispA);
 		}
@@ -2287,9 +2376,10 @@ public:
 				vfoA.freq = freq;
 				selrig->set_vfoA(vfoA.freq);
 			}
+			xml_A.update_freq(vfoA.freq);
 		}
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		xml_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispA);
 	}
@@ -2325,7 +2415,7 @@ public:
 				vfoA.freq += freq;
 				selrig->set_vfoA(vfoA.freq);
 			}
-
+			xml_A.update_freq(vfoA.freq);
 			Fl::awake(setFreqDispA);
 		}
 	}
@@ -2376,12 +2466,12 @@ public:
 				selrig->set_vfoB(freq);
 				vfoB.freq = freq;
 			}
-
+			xml_B.update_freq(vfoB.freq);
 			Fl::awake(setFreqDispB);
 		}
 
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		xml_trace(1, s.str().c_str());
 	}
 
 	std::string help() { return std::string("rig.set_vfo NNNNNNNN (Hz)"); }
@@ -2427,10 +2517,11 @@ public:
 				selrig->set_vfoB(freq);
 				vfoB.freq = selrig->get_vfoB();
 			}
+			xml_B.update_freq(vfoB.freq);
 			Fl::awake(setFreqDispB);
 		}
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		xml_trace(1, s.str().c_str());
 
 	}
 	std::string help() { return std::string("rig.set_verify_vfo NNNNNNNN (Hz)"); }
@@ -2478,10 +2569,11 @@ public:
 				selrig->set_vfoB(freq);
 				vfoB.freq = freq;
 			}
+			xml_B.update_freq(vfoB.freq);
 		}
 
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		xml_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispB);
 	}
@@ -2517,6 +2609,7 @@ public:
 			selrig->set_vfoB(vfoB.freq);
 			vfoB.freq += freq;
 		}
+		xml_B.update_freq(vfoB.freq);
 
 		Fl::awake(setFreqDispB);
 
@@ -2670,7 +2763,7 @@ public:
 		}
 
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		xml_trace(1, s.str().c_str());
 
 	}
 	std::string help() { return std::string("rig.set_vfo NNNNNNNN (Hz)"); }
@@ -2719,7 +2812,7 @@ public:
 		}
 
 		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-		test_trace(1, s.str().c_str());
+		xml_trace(1, s.str().c_str());
 
 	}
 	std::string help() { return std::string("rig.set_verify_vfo NNNNNNNN (Hz)"); }
@@ -2895,17 +2988,17 @@ public:
 						}
 					}
 					s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-					test_trace(1, s.str().c_str());
+					xml_trace(1, s.str().c_str());
 					result = 1;
 					return;
 				}
 			}
 s << ", failed @: " << ztime();
-test_trace(1, s.str().c_str());
+xml_trace(1, s.str().c_str());
 			return;
 		} catch (const std::exception& e) {
 s << " ERROR: " << e.what();
-test_trace(1, s.str().c_str());
+xml_trace(1, s.str().c_str());
 			LOG_ERROR("%s", e.what());
 			xmlrpc_pending = false;
 		}
@@ -2967,7 +3060,7 @@ public:
 						}
 					}
 					s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-					test_trace(1, s.str().c_str());
+					xml_trace(1, s.str().c_str());
 					result = 1;
 					return;
 				}
@@ -3032,14 +3125,14 @@ public:
 						Fl::awake(set_Mode_BW_control);
 					}
 					s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-					test_trace(1, s.str().c_str());
+					xml_trace(1, s.str().c_str());
 					result = 1;
 					return;
 				}
 			}
 
 			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-			test_trace(1, s.str().c_str());
+			xml_trace(1, s.str().c_str());
 
 			return;
 		} catch (const std::exception& e) {
@@ -3089,7 +3182,7 @@ public:
 						Fl::awake(set_Mode_BW_control);
 					}
 					s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-					test_trace(1, s.str().c_str());
+					xml_trace(1, s.str().c_str());
 					result = 1;
 					return;
 				}
@@ -3150,14 +3243,14 @@ public:
 						Fl::awake(set_Mode_BW_control);
 					}
 					s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-					test_trace(1, s.str().c_str());
+					xml_trace(1, s.str().c_str());
 					result = 1;
 					return;
 				}
 			}
 
 			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-			test_trace(1, s.str().c_str());
+			xml_trace(1, s.str().c_str());
 
 			return;
 		} catch (const std::exception& e) {
@@ -3205,7 +3298,7 @@ public:
 						Fl::awake(set_Mode_BW_control);
 					}
 					s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-					test_trace(1, s.str().c_str());
+					xml_trace(1, s.str().c_str());
 					result = 1;
 					return;
 				}
@@ -4832,6 +4925,46 @@ public:
 
 } rig_shutdown(&rig_server);
 
+//-----------------------------------------------------------------------------
+// get/set aging value
+// aging applied to freq, mode, bandwidth and ptt
+// if current value was read from transceiver with 'aging' msec then use that
+// value
+// else read from transceiver
+//-----------------------------------------------------------------------------
+
+class rig_get_aging : public XmlRpcServerMethod {
+//	bool lastptt = false;
+public:
+	rig_get_aging(XmlRpcServer* s) : XmlRpcServerMethod("rig.get_aging", s) {}
+
+	void execute(XmlRpcValue& params, XmlRpcValue& result) { 
+		Fl::awake(connection_ON);
+
+		result = int(TOD_STALE);
+	}
+
+	std::string help() { return std::string("returns aging in msec"); }
+
+} rig_get_aging(&rig_server);
+
+class rig_set_aging : public XmlRpcServerMethod {
+//	bool lastptt = false;
+public:
+	rig_set_aging(XmlRpcServer* s) : XmlRpcServerMethod("rig.set_aging", s) {}
+
+	void execute(XmlRpcValue& params, XmlRpcValue& result) { 
+		Fl::awake(connection_ON);
+
+		TOD_STALE = int(params[0]);
+
+	}
+
+	std::string help() { return std::string("sets aging in msec"); }
+
+} rig_set_aging(&rig_server);
+
+
 //------------------------------------------------------------------------------
 // Execute command button, 1..24
 // Execute command button SHIFT, 25..48
@@ -5002,6 +5135,9 @@ struct MLIST {
 	{ "rig.vfoA2B",               "n:n", "set vfo B to vfo A freq/mode" },
 	{ "rig.freqA2B",              "n:n", "set freq B to freq A" },
 	{ "rig.modeA2B",              "n:n", "set mode B to mode A" },
+
+	{ "rig.set_aging",            "n:i", "set allowable msecs before read data invalid" },
+	{ "rig.get_aging",            "i:n", "get allowable msecs before read data invalid" },
 
 	{ "rig.cmd",                  "n:i", "execute command button 1..24; 25..48(shift)"}
 };

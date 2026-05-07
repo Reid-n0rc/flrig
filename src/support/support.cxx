@@ -568,11 +568,15 @@ void TRACED(read_bandwidth)
 		vfoA.iBW = vfo->iBW = selrig->get_bwA();//nu_BW;
 		Fl::awake(setBWControl);
 		vfoB.iBW = selrig->get_bwB();//nu_BW;
+		xml_A.update_bw(vfoA.iBW);
+		xml_B.update_bw(vfoB.iBW);
 		return;
 	}
 	if (xcvr_name == rig_KX3.name_ || xcvr_name == rig_K4.name_) {
 		vfoA.iBW = selrig->get_bwA();
 		vfoB.iBW = selrig->get_bwB();
+		xml_A.update_bw(vfoA.iBW);
+		xml_B.update_bw(vfoB.iBW);
 
 		Fl::awake(set_Kx_bandwidths);
 
@@ -582,9 +586,11 @@ void TRACED(read_bandwidth)
 	std::stringstream s;
 	if (selrig->inuse == onA) {
 		vfoA.iBW = vfo->iBW = selrig->get_bwA();
+		xml_A.update_bw(vfoA.iBW);
 		s << "read_bandwidth(vfoA): " << printXCVR_STATE(vfoA);
 	} else {
 		vfoB.iBW = vfo->iBW = selrig->get_bwB();
+		xml_B.update_bw(vfoB.iBW);
 		s << "read_bandwidth(vfoB): " << printXCVR_STATE(vfoB);
 	}
 	rig_trace(1, s.str().c_str());
@@ -1254,11 +1260,9 @@ void check_ptt()
 		selrig->name_ == rig_FT818ND.name_ ) {
 		return;
 	}
-	int chk = ptt_state();
-	if (chk != PTT) {
-		PTT = chk;
-		Fl::awake(set_ptt, (void *)PTT);
-	}
+	PTT = ptt_state();
+	xml_A.update_ptt(PTT);
+	Fl::awake(set_ptt, (void *)PTT);
 }
 
 void check_break_in()
@@ -1512,11 +1516,13 @@ void serviceA(XCVR_STATE nuvals)
 			}
 			if (vfoA.iBW != nuvals.iBW) {
 				selrig->set_bwA(nuvals.iBW);
-				selrig->get_bwA();
+				vfoA.iBW = selrig->get_bwA();
+				xml_A.update_bw(vfoA.iBW);
 			}
 			if (vfoA.freq != nuvals.freq) {
 				selrig->set_vfoA(nuvals.freq);
-				selrig->get_vfoA();
+				vfoA.freq = selrig->get_vfoA();
+				xml_A.update_freq(vfoA.freq);
 			}
 			vfoA = nuvals;
 		} else if (xcvr_name != rig_TT550.name_) {
@@ -1536,6 +1542,10 @@ void serviceA(XCVR_STATE nuvals)
 
 			selrig->selectB();
 			vfoA = nuvals;
+
+			xml_A.update_freq(vfoA.freq);
+			xml_A.update_mode(vfoA.imode);
+			xml_A.update_bw(vfoA.iBW);
 		}
 		Fl::awake(setFreqDispA);
 		return;
@@ -1571,6 +1581,7 @@ void serviceA(XCVR_STATE nuvals)
 	if (vfoA.iBW != nuvals.iBW) {
 		selrig->set_bwA(vfoA.iBW = nuvals.iBW);
 		selrig->get_bwA();
+		xml_A.update_bw(vfoA.iBW);
 	}
 	if (vfoA.freq != nuvals.freq) {
 		trace(1, "change vfoA frequency");
@@ -1827,8 +1838,9 @@ extern bool xmlrpc_pending;
 			Fl::awake(serial_failed);
 		}
 
-		if (progStatus.poll_ptt) {
-			guard_lock lk(&mutex_serial,
+//		if (progStatus.poll_ptt) {
+		{
+			guard_lock lk( &mutex_serial,
 				std::string(__func__).append(" ").append("ptt"));
 			check_ptt();
 		}
@@ -1846,21 +1858,23 @@ extern bool xmlrpc_pending;
 			Fl::awake(show_meters, (void *)1);
 
 			if (progStatus.poll_frequency) {
-				guard_lock lk(
-					&mutex_serial,
+				guard_lock lk( &mutex_serial,
 					std::string(__func__).append(" ").append("vfo"));
 				read_vfo();
 			}
 			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			while ( tx_polling->poll != NULL ) {
-				guard_lock lk(
-					&mutex_serial,
-					std::string(__func__).append(" ").append(tx_polling->name));
-				if (*tx_polling->poll) (tx_polling->pollfunc)();
+				Fl::awake();
+				if (xmlrpc_pending || !PTT) break;
+				if (*tx_polling->poll)  {
+					guard_lock lk( &mutex_serial,
+						std::string(__func__).append(" ").append(tx_polling->name));
+					(tx_polling->pollfunc)();
+//					check_ptt();
+				} else
+					MilliSleep(10);
 				++tx_polling;
-				if (xmlrpc_pending) break;
-				MilliSleep(10);
 			}
 			if (tx_polling->poll == NULL)
 				tx_polling = &TX_poll_pairs[0];
@@ -1876,47 +1890,55 @@ extern bool xmlrpc_pending;
 			Fl::awake(show_meters, (void *)0);
 
 			while ( (rx_poll_group_1->poll != NULL) ) {
-				guard_lock lk(
-					&mutex_serial,
-					std::string(__func__).append(" ").append(rx_poll_group_1->name));
-				if (*rx_poll_group_1->poll) (rx_poll_group_1->pollfunc)();
+				Fl::awake();
+				if (xmlrpc_pending || PTT) break;
+				if (*rx_poll_group_1->poll) {
+					guard_lock lk( &mutex_serial,
+						std::string(__func__).append(" ").append(rx_poll_group_1->name));
+					(rx_poll_group_1->pollfunc)();
+//					check_ptt();
+				} else
+					MilliSleep(10);
 				++rx_poll_group_1;
-				if (xmlrpc_pending) break;
-				MilliSleep(10);
 			}
 			if ((rx_poll_group_1)->poll == NULL)
 				rx_poll_group_1 = &RX_poll_group_1[0];
 			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			while ( (rx_poll_group_2->poll != NULL) ) {
-				guard_lock lk(
-					&mutex_serial,
-					std::string(__func__).append(" ").append(rx_poll_group_2->name));
-				if (*rx_poll_group_2->poll) (rx_poll_group_2->pollfunc)();
+				Fl::awake();
+				if (xmlrpc_pending || PTT) break;
+				if (*rx_poll_group_2->poll) {
+					guard_lock lk( &mutex_serial,
+						std::string(__func__).append(" ").append(rx_poll_group_2->name));
+					(rx_poll_group_2->pollfunc)();
+//					check_ptt();
+				} else
+					MilliSleep(10);
 				++rx_poll_group_2;
-				if (xmlrpc_pending) break;
-				MilliSleep(10);
 			}
 			if ((rx_poll_group_2)->poll == NULL)
 				rx_poll_group_2 = &RX_poll_group_2[0];
 			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			while ( (rx_poll_group_3->poll != NULL) ) {
-				guard_lock lk(
-					&mutex_serial,
-					std::string(__func__).append(" ").append(rx_poll_group_3->name));
-				if (*rx_poll_group_3->poll) (rx_poll_group_3->pollfunc)();
+				Fl::awake();
+				if (xmlrpc_pending || PTT) break;
+				if (*rx_poll_group_3->poll) {
+					guard_lock lk( &mutex_serial,
+						std::string(__func__).append(" ").append(rx_poll_group_3->name));
+					(rx_poll_group_3->pollfunc)();
+//					check_ptt();
+				} else
+					MilliSleep(10);
 				++rx_poll_group_3;
-				if (xmlrpc_pending) break;
-				MilliSleep(10);
 			}
 			if ((rx_poll_group_3)->poll == NULL)
 				rx_poll_group_3 = &RX_poll_group_3[0];
 			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			if (menu1 < 9  && selrig->name_ == rig_QCXP.name_) {
-				guard_lock lk(
-					&mutex_serial,
+				guard_lock lk( &mutex_serial,
 					std::string(__func__).append(" ").append("QCX+"));
 				read_menu();
 			}
@@ -1972,10 +1994,13 @@ void selectFILT()
 	guard_lock lock( &mutex_serial, std::string(__func__) );
 	btnFILT->label(selrig->nextFILT());
 	btnFILT->redraw_label();
-	if (selrig->inuse == onB)
+	if (selrig->inuse == onB) {
 		vfoB.iBW = vfo->iBW = selrig->get_bwB();
-	else
+		xml_B.update_bw(vfoB.iBW);
+	} else {
 		vfoA.iBW = vfo->iBW = selrig->get_bwA();
+		xml_A.update_bw(vfoA.iBW);
+	}
 	setBWControl(NULL);
 }
 
@@ -2161,8 +2186,10 @@ void set_bandwidth_control()
 //	}
 	if (selrig->inuse == onB) {
 		vfoB.iBW = vfo->iBW = selrig->get_bwB();
+		xml_B.update_bw(vfoB.iBW);
 	} else {
 		vfoA.iBW = vfo->iBW = selrig->get_bwA();
+		xml_A.update_bw(vfoA.iBW);
 	}
 
 	Fl::awake(updateBandwidthControl);
@@ -2586,6 +2613,9 @@ void execute_swapAB()
 			vfoA.freq = selrig->get_vfoA();
 			vfoA.imode = selrig->get_modeA();
 			vfoA.iBW = selrig->get_bwA();
+			xml_A.update_freq(vfoA.freq);
+			xml_A.update_mode(vfoA.imode);
+			xml_A.update_bw(vfoA.iBW);
 
 			selrig->selectB();
 			vfoB = vfotemp;
@@ -2595,6 +2625,9 @@ void execute_swapAB()
 			vfoB.freq = selrig->get_vfoB();
 			vfoB.imode = selrig->get_modeB();
 			vfoB.iBW = selrig->get_bwB();
+			xml_B.update_freq(vfoB.freq);
+			xml_B.update_mode(vfoB.imode);
+			xml_B.update_bw(vfoB.iBW);
 			vfo = &vfoB;
 		} else {
 			XCVR_STATE vfotemp = vfoB;
@@ -2606,6 +2639,9 @@ void execute_swapAB()
 			vfoB.freq = selrig->get_vfoB();
 			vfoB.imode = selrig->get_modeB();
 			vfoB.iBW = selrig->get_bwB();
+			xml_B.update_freq(vfoB.freq);
+			xml_B.update_mode(vfoB.imode);
+			xml_B.update_bw(vfoB.iBW);
 
 			selrig->selectA();
 			vfoA = vfotemp;
@@ -2615,7 +2651,10 @@ void execute_swapAB()
 			vfoA.freq = selrig->get_vfoA();
 			vfoA.imode = selrig->get_modeA();
 			vfoA.iBW = selrig->get_bwA();
-			vfo = &vfoA;
+			xml_A.update_freq(vfoA.freq);
+			xml_A.update_mode(vfoA.imode);
+			xml_A.update_bw(vfoA.iBW);
+vfo = &vfoA;
 		}
 	}
 	Fl::awake(updateUI);
@@ -2684,6 +2723,9 @@ void execute_A2B()
 				vfoA.freq = selrig->get_vfoA();
 				vfoA.imode = selrig->get_modeA();
 				vfoA.iBW = selrig->get_bwA();
+				xml_A.update_freq(vfoA.freq);
+				xml_A.update_mode(vfoA.imode);
+				xml_A.update_bw(vfoA.iBW);
 			}
 			FreqDispA->value(vfoA.freq);
 		} else {
@@ -2697,6 +2739,9 @@ void execute_A2B()
 				vfoB.freq = selrig->get_vfoB();
 				vfoB.imode = selrig->get_modeB();
 				vfoB.iBW = selrig->get_bwB();
+				xml_B.update_freq(vfoB.freq);
+				xml_B.update_mode(vfoB.imode);
+				xml_B.update_bw(vfoB.iBW);
 			}
 			FreqDispB->value(vfoB.freq);
 		}
@@ -4087,11 +4132,11 @@ void TRACED(setPTT, void *d)
 	guard_lock serlck( &mutex_serial, std::string(__func__) );
 	chk = chkptt();
 	rigPTT(set);
-	MilliSleep(50);
+	MilliSleep(progStatus.serial_post_write_delay);
 	for (int n = 0; n < 100; n++) {
 		chk = chkptt();
 		if (set == chk) break;
-		MilliSleep(progStatus.serial_post_write_delay);
+		MilliSleep(10);
 	}
 	return;
 }

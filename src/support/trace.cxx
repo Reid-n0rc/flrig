@@ -61,6 +61,7 @@ bool stdout_trace =
 	false;
 
 bool pausetrace = false;
+bool recordtrace = false;
 
 static void cb_view_trace_config(Fl_Button *, void *)
 {
@@ -80,6 +81,11 @@ static void cb_cleartrace(Fl_Button *, void *)
 	pthread_mutex_unlock(&mutex_trace);
 }
 
+static void cb_record_trace(Fl_Light_Button *o, void *)
+{
+	recordtrace = o->value();
+}
+
 void make_trace_window() {
 	tracewindow = new Fl_Double_Window(600, 300, _("Trace log"));
 	tracedisplay = new Fl_Text_Display(0, 0, 600, 270);
@@ -88,8 +94,14 @@ void make_trace_window() {
 	tracedisplay->textfont(FL_SCREEN);
 	tracedisplay->wrap_mode(Fl_Text_Display::WRAP_NONE, 100);
 
+	btn_record_trace = new Fl_Light_Button(340, 275, 80, 20, _("Record"));
+	btn_record_trace->callback((Fl_Callback *) cb_record_trace);
+
 	btn_view_trace_config = new Fl_Button(5, 275, 80, 20, _("Config"));
 	btn_view_trace_config->callback((Fl_Callback *)cb_view_trace_config);
+
+	btn_record_trace = new Fl_Light_Button(340, 275, 80, 20, _("Record"));
+	btn_record_trace->callback((Fl_Callback *) cb_record_trace);
 
 	btn_pausetrace = new Fl_Light_Button(430, 275, 80, 20, _("Pause"));
 	btn_pausetrace->callback((Fl_Callback *)cb_pausetrace);
@@ -103,6 +115,7 @@ void make_trace_window() {
 // system level does not need lock
 static void write_trace_file(std::string s)
 {
+	if (!recordtrace) return;
 	std::string trace_fname = RigHomeDir;
 	trace_fname.append("trace.txt");
 	std::fstream tfile(trace_fname.c_str(), std::ios::app);
@@ -173,11 +186,11 @@ void xml_trace(int n, ...) // all args of type const char *
 	std::stringstream s;
 	va_list vl;
 	va_start(vl, n);
-	s << ztime();
-#ifdef HAS_XMLRPC_CLIENT_ID
-	s << " [" << XmlRpc::client_id << "]";
-#endif
-	s << " : " << va_arg(vl, const char *);
+//	s << ztime();
+//#ifdef HAS_XMLRPC_CLIENT_ID
+//	s << " [" << XmlRpc::client_id << "]";
+//#endif
+	s << va_arg(vl, const char *);
 	for (int i = 1; i < n; i++)
 		s << " " << va_arg(vl, const char *);
 	va_end(vl);
@@ -427,6 +440,7 @@ void failure_trace(int n, ...)
 
 void test_trace(int n, ...)
 {
+	return;
 	if (!n) return;
 	if (!tracewindow) make_trace_window();
 

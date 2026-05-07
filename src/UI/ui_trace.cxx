@@ -72,6 +72,7 @@ Fl_Double_Window*	tracewindow = (Fl_Double_Window *)0;
 	Fl_Text_Buffer*		tracebuffer = (Fl_Text_Buffer*)0;
 	Fl_Button*			btn_view_trace_config = (Fl_Button *)0;
 	Fl_Button*			btn_cleartrace = (Fl_Button *)0;
+	Fl_Light_Button*	btn_record_trace = (Fl_Light_Button *)0;
 	Fl_Light_Button*	btn_pausetrace = (Fl_Light_Button *)0;
 
 Fl_Double_Window*	config_trace_dialog = (Fl_Double_Window *)0;

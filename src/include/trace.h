@@ -42,6 +42,7 @@ extern Fl_Double_Window*	tracewindow;
 extern 	Fl_Text_Display*	tracedisplay;
 extern 	Fl_Text_Buffer*		tracebuffer;
 extern	Fl_Button*			btn_view_trace_config;
+extern	Fl_Light_Button*	btn_record_trace;
 extern 	Fl_Button*			btn_cleartrace;
 extern 	Fl_Light_Button*	btn_pausetrace;
 
