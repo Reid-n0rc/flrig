@@ -350,6 +350,14 @@ public:
 		void execute(XmlRpcValue& params, XmlRpcValue& result) { 
 		Fl::awake(connection_ON);
 
+		std::stringstream s;
+		unsigned long int t0 = zmsec();
+
+		s << ztime();
+		#ifdef HAS_XMLRPC_CLIENT_ID
+			s << " [" << XmlRpc::client_id << "]";
+		#endif
+
 		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml get split");
 		xmlrpc_pending = false;
@@ -357,8 +365,11 @@ public:
 		int split_state = selrig->get_split();
 		progStatus.split = split_state;
 
+		s << " [ " << zmsec() - t0 << " msec ]";
+		s << " rig.get_split " << (split_state ? "ON" : "OFF");
+
 		result = split_state;
-		xml_trace(2, "rig_get_split ", (split_state ? "ON" : "OFF"));
+		xml_trace(1, s.str().c_str());
 	}
 
 	std::string help() { return std::string("returns state of split"); }
@@ -1370,7 +1381,7 @@ public:
 #endif
 		s << " [ " << zmsec() - t0 << " msec ]";
 		s << " bandwidth on " << ((selrig->inuse == onB) ? "B " : "A ");
-		s << s1;
+		s << " " << s1;
 		if (!s2.empty()) s << " | " << s2;
 		xml_trace( 1, s.str().c_str() );
 	}
@@ -1942,6 +1953,8 @@ public:
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
 
+		s << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
+		s << " {" << zmsec() - start << " msec}";
 		xmlrpc_pending = true;
 		guard_lock ser_lock (&mutex_serial, "xml set ptt");
 		xmlrpc_pending = false;
@@ -1951,7 +1964,6 @@ public:
 		rigPTT(PTT);
 
 		s << " [ " << zmsec() - start << " msec ]";
-		s << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
 		xml_trace(1, s.str().c_str());
 		test_trace(1, s.str().c_str());
 
@@ -2256,7 +2268,6 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_vfoA " << freq;
 
 		if (freq != vfoA.freq) {
 
@@ -2279,7 +2290,9 @@ public:
 			Fl::awake(setFreqDispA);
 		}
 
-		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		s << " [ " << zmsec() - start << " msec ] ";
+		s << " rig.set_vfoA " << freq;
+
 		xml_trace(1, s.str().c_str());
 
 	}
@@ -2307,15 +2320,12 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_verify_vfoA " << freq;
 
 		if (vfoA.freq != freq) {
 
 			xmlrpc_pending = true;
 			guard_lock serial(&mutex_serial, "xml set verify vfoA");
 			xmlrpc_pending = false;
-
-			s << " @ " << ztime();
 
 			if (!selrig->can_change_alt_vfo  && (selrig->inuse == onB)) {
 				selrig->selectA();
@@ -2327,7 +2337,8 @@ public:
 				vfoA.freq = selrig->get_vfoA();
 			}
 			xml_A.update_freq(vfoA.freq);
-			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+			s << " [ " << zmsec() - start << " msec ]";
+			s << " rig.set_verify_vfoA " << freq;
 			xml_trace(1, s.str().c_str());
 
 			Fl::awake(setFreqDispA);
@@ -2357,7 +2368,6 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_verify_vfoA_fast " << freq;
 
 		if (vfoA.freq != freq) {
 
@@ -2378,7 +2388,8 @@ public:
 			}
 			xml_A.update_freq(vfoA.freq);
 		}
-		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		s << " [ " << zmsec() - start << " msec ]";
+		s << " rig.set_verify_vfoA_fast " << freq;
 		xml_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispA);
@@ -2447,15 +2458,12 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_vfoB " << freq;
 
 		if (vfoB.freq != freq) {
 
 			xmlrpc_pending = true;
 			guard_lock serial(&mutex_serial, "xml set vfoB");
 			xmlrpc_pending = false;
-
-			s << " @ " << ztime();
 
 			if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 				selrig->selectB();
@@ -2470,7 +2478,8 @@ public:
 			Fl::awake(setFreqDispB);
 		}
 
-		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		s << " [ " << zmsec() - start << " msec ] ";
+		s << "rig.set_vfoB " << freq;
 		xml_trace(1, s.str().c_str());
 	}
 
@@ -2498,15 +2507,12 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_verify_vfoB " << freq;
 
 		if (vfoB.freq != freq) {
 
 			xmlrpc_pending = true;
 			guard_lock serial(&mutex_serial, "xml set verify vfoB");
 			xmlrpc_pending = false;
-
-			s << " @ " << ztime();
 
 			if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 				selrig->selectB();
@@ -2520,7 +2526,8 @@ public:
 			xml_B.update_freq(vfoB.freq);
 			Fl::awake(setFreqDispB);
 		}
-		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		s << " [ " << zmsec() - start << " msec ]";
+		s << " rig.set_verify_vfoB " << freq;
 		xml_trace(1, s.str().c_str());
 
 	}
@@ -2550,7 +2557,6 @@ public:
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_vfoB_fast " << freq;
 
 		if (vfoB.freq != freq) {
 
@@ -2572,7 +2578,8 @@ public:
 			xml_B.update_freq(vfoB.freq);
 		}
 
-		s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+		s << " [ " << zmsec() - start << " msec ]";
+		s << " rig.set_vfoB_fast " << freq;
 		xml_trace(1, s.str().c_str());
 
 		Fl::awake(setFreqDispB);

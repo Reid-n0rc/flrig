@@ -269,10 +269,6 @@ bool RIG_FT890::get_info()
 			A.imode = FT_AMN;
 		}
 
-std::cout << "Info: " << str2hex(replystr.c_str(), replystr.length()) << std::endl;
-
-std::cout << "   A: " << A.freq << ", " << vFT890modes_[A.imode] << std::endl;
-
 		B.iBW = (replystr[9] & 1);
 		B.freq = 10 * ((((replystr[10] & 0xFF) * 256 +
 				   (replystr[11] & 0xFF) ) * 256 +
@@ -298,10 +294,7 @@ std::cout << "   A: " << A.freq << ", " << vFT890modes_[A.imode] << std::endl;
 			B.imode = FT_AMN;
 		}
 
-std::cout << "   B: " << B.freq << ", " << vFT890modes_[B.imode] << std::endl;
-
 	} else {
-std::cout << "failed to read VFO status bytes (18)" << std::endl;
 		return false;
 	}
 
@@ -325,13 +318,7 @@ std::cout << "failed to read VFO status bytes (18)" << std::endl;
 		if ( (replystr[0] & 0x40) == 0x40 ) inuse = onB;
 		if ( (replystr[2] & 0x80) == 0x80 ) ptt_ = true;
 
-std::cout << "Flag Bytes    " << str2hex(replystr.c_str(), replystr.length()) << std::endl;
-std::cout << "  Split:      " << (split ? "ON" : "OFF") << 
-			 "  Active vfo: " << (inuse ? "B" : "A") << 
-			 "  PTT:        " << (ptt_ ? "ON" : "OFF") << std::endl << std::endl;
-
 	} else {
-std::cout << "failed to read flag bytes (5)" << std::endl << std::endl;
 		return false;
 	}
 
