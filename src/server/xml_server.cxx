@@ -318,20 +318,21 @@ public:
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
 
-		xmlrpc_pending = true;
-		guard_lock serial(&mutex_serial, "xml get_ptt");
-		xmlrpc_pending = false;
+		if (xml_A.ptt_stale())
+		{
+			xmlrpc_pending = true;
+			guard_lock serial(&mutex_serial, "xml get_ptt");
+			xmlrpc_pending = false;
 
-		s << " @ " << ztime();
+			int PTT = ptt_state();
+			xml_A.update_ptt(PTT);
+		}
+		s << " [ " << zmsec() - start << " msec ]";
+		s << " rig.get_ptt " << (xml_A.ptt ? " ON " : " OFF ");
+		xml_trace(1, s.str().c_str());
 
-		if (lastptt != PTT)
-			lastptt = PTT;// = selrig->get_PTT();
+		result = int(xml_A.ptt);
 
-		s << " # " << ztime() << (PTT ? " ON " : " OFF ");
-		s << " [ " << zmsec() - start << " ]";
-		test_trace(1, s.str().c_str());
-
-		result = int(PTT);
 	}
 
 	std::string help() { return std::string("returns state of PTT"); }
@@ -1948,6 +1949,45 @@ public:
 		std::stringstream s;
 		long start = zmsec();
 
+		s << ztime() << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
+
+		xmlrpc_pending = true;
+		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
+		xmlrpc_pending = false;
+
+		s << " @ " << ztime();
+		xml_trace(1, (PTT ? "rig_set_ptt ON" : "rig_set_ptt OFF"));
+
+		rigPTT(PTT);
+		{
+			bool get = ptt_state();
+			int cnt = 0;
+			while ((get != PTT) && (cnt++ < 100)) {
+				MilliSleep(10);
+				get = ptt_state();
+			}
+			PTT = get;
+
+			xml_A.update_ptt(PTT);
+
+			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+			xml_trace(1, s.str().c_str());
+
+			Fl::awake(update_UI_PTT);
+		}
+/*
+		Fl::awake(connection_ON);
+
+		if (!xcvr_online || disable_xmlrpc->value()) {
+			result = 0;
+			return;
+		}
+
+		PTT = int(params[0]);
+
+		std::stringstream s;
+		long start = zmsec();
+
 		s << ztime();
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
@@ -1959,15 +1999,15 @@ public:
 		guard_lock ser_lock (&mutex_serial, "xml set ptt");
 		xmlrpc_pending = false;
 
-		s << " @ " << ztime();
+		s << " <" << zmsec() - start << " msec>";
 
 		rigPTT(PTT);
 
 		s << " [ " << zmsec() - start << " msec ]";
 		xml_trace(1, s.str().c_str());
-		test_trace(1, s.str().c_str());
 
 		Fl::awake(update_UI_PTT);
+*/
 	}
 
 	std::string help() { return std::string("sets PTT on (1) or off (0), waits for state change"); }
@@ -2106,13 +2146,15 @@ public:
 			return;
 		}
 		int state = int(params[0]);
-		if (progStatus.split == state) return;
+//		if (progStatus.split == state) return;
 
 		{
 			VFOQUEUE xcvr_split;
 			if (state) xcvr_split.change = sON;
 			else       xcvr_split.change = sOFF;
-			xml_trace(1, (state ? "rig_set_split ON" : "rig_set_split OFF"));
+			xml_trace(3,
+				ztime(), "  ", 
+				(state ? "rig_set_split ON" : "rig_set_split OFF"));
 			serviceXCVR(xcvr_split);
 		}
 	}
@@ -5193,6 +5235,10 @@ void start_server(int port)
 //	XmlRpc::setVerbosity(progStatus.rpc_level);
 
 // Create the server socket on the specified port
+
+#if !defined(__WIN32__) && !defined(__APPLE__)
+	rig_server.useUDS( progStatus.use_UDS );
+#endif
 	rig_server.bindAndListen(port);
 
 // Enable introspection

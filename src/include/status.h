@@ -104,6 +104,7 @@ struct status {
 	bool	aux_dtr;
 
 	std::string	xmlport;
+	bool	use_UDS;
 
 	std::string	sep_serial_port;
 

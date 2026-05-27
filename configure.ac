@@ -108,15 +108,6 @@ if test "x$target_darwin" = "xno" && test "x$target_win32" = "xno"; then
     AC_FLRIG_PKG_CHECK([x], [x11], [no], [yes])
 fi
 
-### libflxmlrpc
-# Set ac_cv_flxmlrpc to yes/no
-# Define USE_FLXMLRPC in config.h
-# Substitute FLXMLRPC_CFLAGS and FLXMLRPC_LIBS in Makefile
-
-AC_FLRIG_PKG_CHECK([flxmlrpc], [flxmlrpc >= 1.0.1], 
-  [yes], [yes], [use external flxmlrpc library @<:@autodetect@:>@],
-  [ENABLE_FLXMLRPC])
-
 ### libgpiod
 # Set ac_cv_libgpiod to yes/no
 # Define USE_LIBGPIOD in config.h
@@ -133,20 +124,12 @@ AC_OUTPUT
 
 ### summary
 
-ac_xmlrpc_report="internal lib";
-
-if test "x$ac_cv_flxmlrpc" = "xyes"; then
-  ac_xmlrpc_report="external lib";
-fi
- 
 AC_MSG_RESULT([
 Configuration summary:
 
   Version ..................... $VERSION
   
   Target OS ................... $target_os
-
-  Have flxmlrpc library ....... $ac_xmlrpc_report
 
   libgpiod .................... $ac_cv_libgpiod
 

@@ -31,6 +31,8 @@
 
 namespace XmlRpc {
 
+	extern const char XMLRPC_VERSION[];
+
 	extern std::string request_str;
 	extern std::string client_id;
 
@@ -52,6 +54,9 @@ namespace XmlRpc {
     //! Destructor.
     virtual ~XmlRpcServer();
 
+#if !defined(__WIN32__) && !defined(__APPLE__)
+    void useUDS(bool yes) { XmlRpc::UDS = yes; }
+#endif
     //! Specify whether introspection is enabled or not. Default is not enabled.
     void enableIntrospection(bool enabled=true);
 

@@ -34,7 +34,11 @@
 
 #define HAS_XMLRPC_CLIENT_ID 1
 
+extern const char LINUX_UDS_PATH[];
+
 namespace XmlRpc {
+
+  extern bool UDS;
 
   //! An interface allowing custom handling of error message reporting.
   class XmlRpcErrorHandler {

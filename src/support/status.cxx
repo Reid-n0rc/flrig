@@ -121,6 +121,7 @@ status progStatus = {
 	false,		// bool aux_dtr;
 
 	"12345",	// std::string xmlport;
+	false,		// bool use_UDS;
 
 	"NONE",		// std::string	sep_serial_port;
 
@@ -1114,6 +1115,7 @@ void status::saveLastState()
 	spref.set("set_dtrplus", sep_dtrplus);
 
 	spref.set("xmlport", xmlport.c_str());
+	spref.set("use_UDS", use_UDS);
 
 	spref.set("cmedia_device", cmedia_device.c_str());
 	spref.set("cmedia_gpio_line", cmedia_gpio_line.c_str());
@@ -1819,6 +1821,7 @@ bool status::loadXcvrState(std::string xcvr)
 		spref.get("xmlport", defbuffer, "12345", MAX_DEFBUFFER_SIZE);
 		xmlport = defbuffer;
 		::xmlport = atoi(xmlport.c_str());
+		if (spref.get("use_UDS", i, i)) use_UDS = i;
 
 		spref.get("cmedia_device", defbuffer, "NONE", MAX_DEFBUFFER_SIZE);
 		cmedia_device = defbuffer;
@@ -2767,6 +2770,8 @@ std::string status::info()
 	info << "aux_serial_port    : " << aux_serial_port.c_str() << "\n";
 	info << "aux_rts            : " << aux_rts << "\n";
 	info << "aux_dtr            : " << aux_dtr << "\n";
+	info << "\n";
+	info << "use_UDS            : " << (use_UDS ? "yes" : "no") << "\n";
 	info << "\n";
 	info << "sep_serial_port    : " << sep_serial_port.c_str() << "\n";
 	info << "sep_rtsptt         : " << sep_rtsptt << "\n";

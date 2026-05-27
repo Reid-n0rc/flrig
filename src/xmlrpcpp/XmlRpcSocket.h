@@ -24,8 +24,18 @@
 
 #include <string>
 
+#if !defined(__WIN32__) && !defined(__APPLE__)// Bind to a specific path
+
+#  include <sys/un.h>
+extern const char LINUX_UDS_PATH[];
+
+#endif
 
 namespace XmlRpc {
+
+#if !defined(__WIN32__) && !defined(__APPLE__)
+  extern bool UDS;
+#endif
 
   //! A platform-independent socket API.
   class XmlRpcSocket {
@@ -65,6 +75,11 @@ namespace XmlRpc {
 
     //! Bind to a specified port
     static bool bind(Socket socket, int port);
+
+#if !defined(__WIN32__) && !defined(__APPLE__)// Bind to a specific path
+    //! Bind to a specified path
+    static bool bind(Socket socket, const char *socket_path);
+#endif
 
     //! Set socket in listen mode
     static bool listen(Socket socket, int backlog);

@@ -9,7 +9,6 @@ MINGW32_SRC = \
 	include/compat.h \
 	include/compat-mingw.h
 
-# Build the xmlrpcpp source if libflxmlrpc is not found
 XMLRPCPP_SRC = \
 	xmlrpcpp/XmlRpcBase64.h \
 	xmlrpcpp/XmlRpcClient.cpp \
@@ -40,20 +39,12 @@ EXTRA_flrig_SOURCES = $(FLRIG_WIN32_RES_SRC) $(MINGW32_SRC) $(XMLRPCPP_SRC)
 
 flrig_SOURCES =
 
-if !ENABLE_FLXMLRPC
-  flrig_SOURCES += $(XMLRPCPP_SRC)
-  flrig_CPPFLAGS = @FLRIG_BUILD_CPPFLAGS@
-  flrig_CXXFLAGS = @FLRIG_BUILD_CXXFLAGS@
-  flrig_CFLAGS = $(flrig_CXXFLAGS)
-  flrig_LDFLAGS = @FLRIG_BUILD_LDFLAGS@
-  flrig_LDADD = @FLRIG_BUILD_LDADD@
-else
-  flrig_CPPFLAGS = @FLRIG_BUILD_CPPFLAGS@ @FLXMLRPC_CFLAGS@
-  flrig_CXXFLAGS = @FLRIG_BUILD_CXXFLAGS@ @FLXMLRPC_CFLAGS@
-  flrig_CFLAGS = $(flrig_CXXFLAGS)
-  flrig_LDFLAGS = @FLRIG_BUILD_LDFLAGS@ @FLXMLRPC_LIBS@
-  flrig_LDADD = @FLRIG_BUILD_LDADD@
-endif
+flrig_SOURCES += $(XMLRPCPP_SRC)
+flrig_CPPFLAGS = @FLRIG_BUILD_CPPFLAGS@
+flrig_CXXFLAGS = @FLRIG_BUILD_CXXFLAGS@
+flrig_CFLAGS = $(flrig_CXXFLAGS)
+flrig_LDFLAGS = @FLRIG_BUILD_LDFLAGS@
+flrig_LDADD = @FLRIG_BUILD_LDADD@
 
 if MINGW32
 if HAVE_WINDRES

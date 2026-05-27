@@ -33,6 +33,10 @@
 #include <strings.h>
 #include <string>
 
+#if !defined(__WIN32__) && !defined(__APPLE__)
+extern const char LINUX_UDS_PATH[];
+#endif
+
 using namespace XmlRpc;
 
 // Static data

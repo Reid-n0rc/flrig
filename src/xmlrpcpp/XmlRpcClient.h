@@ -81,6 +81,9 @@ namespace XmlRpc {
     //! Return the port
     int port() const { return _port; }
 
+#if !defined(__WIN32__) && !defined(__APPLE__)
+    void useUDS() { XmlRpc::UDS = true; }
+#endif
     //! Return the URI
     const char* const uri() const { return _uri.c_str(); }
 

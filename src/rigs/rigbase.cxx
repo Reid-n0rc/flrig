@@ -643,6 +643,9 @@ int rigbase::wait_char(int ch, int n, int timeout, const char *sz, int pr)
 
 	LOG_DEBUG ("%s", ctrace);
 
+if (replystr.find("TX") != std::string::npos)
+xml_trace(5, ztime(), " ", __func__, " ", ctrace);
+
 	return retnbr;
 }
 

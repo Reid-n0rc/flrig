@@ -478,16 +478,17 @@ int main (int argc, char *argv[])
 			fl_filename_expand(dirbuf, FL_PATH_MAX, "$HOME/");
 			HomeDir = dirbuf;
 		}
-
-		DIR *isdir = 0;
-		std::string test_dir;
-		test_dir.assign(HomeDir).append("flrig.files/");
-		isdir = opendir(test_dir.c_str());
-		if (isdir) {
-			RigHomeDir = test_dir;
-			closedir(isdir);
-		} else if (RigHomeDir.empty()) {
-			RigHomeDir.assign(HomeDir).append(".flrig/");
+		if (RigHomeDir.empty()) {
+			DIR *isdir = 0;
+			std::string test_dir;
+			test_dir.assign(HomeDir).append("flrig.files/");
+			isdir = opendir(test_dir.c_str());
+			if (isdir) {
+				RigHomeDir = test_dir;
+				closedir(isdir);
+			} else if (RigHomeDir.empty()) {
+				RigHomeDir.assign(HomeDir).append(".flrig/");
+			}
 		}
 
 #endif

@@ -17,6 +17,8 @@
 
 #include "config.h"
 
+#include <iostream>
+
 #include "XmlRpcServer.h"
 #include "XmlRpcServerConnection.h"
 #include "XmlRpcServerMethod.h"
@@ -59,8 +61,13 @@ XmlRpcServer::~XmlRpcServer()
   _methods.clear();
   delete _listMethods;
   delete _methodHelp;
+#if !defined(__WIN32__) && !defined(__APPLE__)
+  if (XmlRpc::UDS) {
+    std::cout << "remove( " << LINUX_UDS_PATH << " )" << std::endl;
+    remove( LINUX_UDS_PATH );
+  }
+#endif
 }
-
 
 // Add a command to the RPC server
 void 
@@ -109,7 +116,8 @@ XmlRpcServer::bindAndListen(int port, int backlog /*= 5*/)
   {
     XmlRpcUtil::error("XmlRpcServer::bindAndListen: Could not create socket (%s).", XmlRpcSocket::getErrorMsg().c_str());
     return false;
-  }
+  } else
+    std::cout << "Created socket: " << fd << std::endl;
 
   this->setfd(fd);
 
@@ -119,23 +127,39 @@ XmlRpcServer::bindAndListen(int port, int backlog /*= 5*/)
     this->close();
     XmlRpcUtil::error("XmlRpcServer::bindAndListen: Could not set socket to non-blocking input mode (%s).", XmlRpcSocket::getErrorMsg().c_str());
     return false;
-  }
+  } else
+    std::cout << "Set to non blocking" << std::endl;
 
   // Allow this port to be re-bound immediately so server re-starts are not delayed
-  if ( ! XmlRpcSocket::setReuseAddr(fd))
-  {
-    this->close();
-    XmlRpcUtil::error("XmlRpcServer::bindAndListen: Could not set SO_REUSEADDR socket option (%s).", XmlRpcSocket::getErrorMsg().c_str());
-    return false;
-  }
+//  if ( ! XmlRpcSocket::setReuseAddr(fd))
+//  {
+//    this->close();
+//    XmlRpcUtil::error("XmlRpcServer::bindAndListen: Could not set SO_REUSEADDR socket option (%s).", XmlRpcSocket::getErrorMsg().c_str());
+//    return false;
+//  }
 
   // Bind to the specified port on the default interface
-  if ( ! XmlRpcSocket::bind(fd, port))
-  {
-    this->close();
-    XmlRpcUtil::error("XmlRpcServer::bindAndListen: Could not bind to specified port (%s).", XmlRpcSocket::getErrorMsg().c_str());
-    return false;
-  }
+  // optionally use Unix Domain Socket interface on Linux
+  bool bind_result = true;
+#if !defined(__WIN32__) && !defined(__APPLE__)// Bind to a specific path
+	if (XmlRpc::UDS) {
+		bind_result = XmlRpcSocket::bind(fd, LINUX_UDS_PATH);
+	}
+	else {
+		bind_result = XmlRpcSocket::bind(fd, port);
+	}
+#else
+	bind_result = XmlRpcSocket::bind(fd, port);
+#endif
+  if (!bind_result) {
+      this->close();
+      XmlRpcUtil::error("XmlRpcServer::bindAndListen: Could not bind to specified port %d, using %s. %s).", 
+		port,
+		(XmlRpc::UDS ? "AFNET" : "INET"), 
+		XmlRpcSocket::getErrorMsg().c_str());
+      return false;
+  } else
+    std::cout << "Server bind to " << port << "using " << (XmlRpc::UDS ? "AFNET" : "INET") << std::endl;
 
   // Set in listening mode
   if ( ! XmlRpcSocket::listen(fd, backlog))
@@ -143,7 +167,8 @@ XmlRpcServer::bindAndListen(int port, int backlog /*= 5*/)
     this->close();
     XmlRpcUtil::error("XmlRpcServer::bindAndListen: Could not set socket in listening mode (%s).", XmlRpcSocket::getErrorMsg().c_str());
     return false;
-  }
+  } else
+    std::cout << "Listening on " << port << std::endl;
 
   XmlRpcUtil::log(2, "XmlRpcServer::bindAndListen: server listening on port %d fd %d", port, fd);
 

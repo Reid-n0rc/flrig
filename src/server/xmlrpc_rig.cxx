@@ -190,6 +190,10 @@ bool connect_to_client()
 		flrig_client = new XmlRpcClient(
 				progStatus.xmlrig_addr.c_str(),
 				atol(progStatus.xmlrig_port.c_str()));
+#if !defined(__WIN32__) && !defined(__APPLE__)
+		if (progStatus.use_UDS)
+			flrig_client->useUDS();
+#endif
 		return client_connection();
 	} catch (...) {
 		xml_trace(3,"Cannot connect to %s : %s", progStatus.xmlrig_addr.c_str(), progStatus.xmlrig_port.c_str());

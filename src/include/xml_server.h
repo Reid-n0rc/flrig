@@ -56,6 +56,9 @@ struct XML_DATA {
 	int bw;
 	unsigned long long int bw_tod;
 
+	int ptt;
+	unsigned long long int ptt_tod;
+
 	unsigned long long int tod;
 
 	XML_DATA() {

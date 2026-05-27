@@ -2589,7 +2589,6 @@ trace(1, "selrig->initialize()");
 				MilliSleep(500);
 				if (!selrig->check()) {
 					trace(1, "FAILED");
-					bypass_serial_thread_loop = true;
 
 					xcvr_online = false;
 					adjust_control_positions();
@@ -2606,6 +2605,8 @@ trace(1, "selrig->initialize()");
 		Press 'Update' button, reselect port\n\
 		Check that Baud matches transceiver baud\n\n\
 		Press 'Init' button."));
+
+					bypass_serial_thread_loop = true;
 					return;
 				}
 			}

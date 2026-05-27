@@ -40,6 +40,8 @@ using namespace XmlRpc;
 #include <windows.h>
 #endif
 
+bool XmlRpc::UDS = false;
+
 // Version id
 const char XmlRpc::XMLRPC_VERSION[] = "XMLRPC++ 0.8";
 
@@ -70,7 +72,7 @@ public:
 //    OutputDebugString(msg); OutputDebugString("\n");
 #else
 	rpc_trace(1, msg);
-//    std::cerr << msg << std::endl; 
+	std::cerr << msg << std::endl; 
 #endif  
   }
 } defaultErrorHandler;

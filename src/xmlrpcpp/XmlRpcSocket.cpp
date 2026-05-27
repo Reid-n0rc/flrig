@@ -17,6 +17,12 @@
 
 #include "config.h"
 
+#include <iostream>
+
+#if !defined(__WIN32__) && !defined(__APPLE__)
+#  include <sys/un.h>
+#endif
+
 #include "XmlRpcSocket.h"
 #include "XmlRpcUtil.h"
 
@@ -58,7 +64,12 @@ extern "C" {
 }
 #endif  // _WINDOWS
 
+#if !defined(__WIN32__) && !defined(__APPLE__)
+const char LINUX_UDS_PATH[] = "/tmp/flrig_uds.sock";
+#endif
+
 using namespace XmlRpc;
+
 // One-time initializations
 static bool initialized = false;
 
@@ -101,6 +112,10 @@ XmlRpcSocket::Socket
 XmlRpcSocket::socket()
 {
   if ( ! initialized) initialize();
+#if !defined(__WIN32__) && !defined(__APPLE__)
+  if (XmlRpc::UDS)
+    return ::socket(AF_UNIX, SOCK_STREAM, 0);
+#endif
   return ::socket(AF_INET, SOCK_STREAM, 0);
 }
 
@@ -151,6 +166,19 @@ XmlRpcSocket::bind(XmlRpcSocket::Socket fd, int port)
   return (::bind(fd, (struct sockaddr *)&saddr, sizeof(saddr)) == 0);
 }
 
+#if !defined(__WIN32__) && !defined(__APPLE__)
+// Bind to a specific path
+	bool
+	XmlRpcSocket::bind( XmlRpcSocket::Socket fd, const char *socket_path)
+	{
+		struct sockaddr_un saddr;
+		memset(&saddr, 0, sizeof(saddr));
+		saddr.sun_family = AF_UNIX;
+		strncpy(saddr.sun_path, socket_path, sizeof(saddr.sun_path) - 1);
+		int ret =  ::bind(fd, (struct sockaddr *)&saddr, sizeof(saddr));
+		return ( ret == 0);
+	}
+#endif
 
 // Set socket in listen mode
 bool
@@ -175,20 +203,36 @@ XmlRpcSocket::accept(XmlRpcSocket::Socket fd)
 bool
 XmlRpcSocket::connect(XmlRpcSocket::Socket fd, std::string& host, int port)
 {
-  struct sockaddr_in saddr;
-  memset(&saddr, 0, sizeof(saddr));
-  saddr.sin_family = AF_INET;
+  int result;
+#if !defined(__WIN32__) && !defined(__APPLE__)
+  if (XmlRpc::UDS) {
+    struct sockaddr_un saddr;
 
-  struct hostent *hp = gethostbyname(host.c_str());
-  if (hp == 0) return false;
+    // Configure server address
+    memset(&saddr, 0, sizeof(struct sockaddr_un));
+    saddr.sun_family = AF_UNIX;
+    strncpy(saddr.sun_path, LINUX_UDS_PATH, sizeof(saddr.sun_path) - 1);
 
-  saddr.sin_family = hp->h_addrtype;
-  memcpy(&saddr.sin_addr, hp->h_addr, hp->h_length);
-  saddr.sin_port = htons((u_short) port);
+    result = ::connect(fd, (struct sockaddr *)&saddr, sizeof(struct sockaddr_un));
 
-  // For asynch operation, this will return EWOULDBLOCK (windows) or
-  // EINPROGRESS (linux) and we just need to wait for the socket to be writable...
-  int result = ::connect(fd, (struct sockaddr *)&saddr, sizeof(saddr));
+  } else 
+#endif
+  {
+      struct sockaddr_in saddr;
+      memset(&saddr, 0, sizeof(saddr));
+      saddr.sin_family = AF_INET;
+
+      struct hostent *hp = gethostbyname(host.c_str());
+      if (hp == 0) return false;
+
+      saddr.sin_family = hp->h_addrtype;
+      memcpy(&saddr.sin_addr, hp->h_addr, hp->h_length);
+      saddr.sin_port = htons((u_short) port);
+
+      result = ::connect(fd, (struct sockaddr *)&saddr, sizeof(saddr));
+  }
+// std::cout << "::connect result " << result << std::endl;
+
   return result == 0 || nonFatalError();
 }
 
