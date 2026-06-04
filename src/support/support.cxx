@@ -2661,22 +2661,17 @@ vfo = &vfoA;
 void cbAswapB()
 {
 	VFOQUEUE xcvr;
-	if ((Fl::event_state() & FL_SHIFT) == FL_SHIFT) {
-		xcvr.change = FA2FB;
-		trace(1, "cb VfoA freq -> VfoB freq");
-	} else if ((Fl::event_state() & FL_CTRL) == FL_CTRL) {
-		xcvr.change = FB2FA;
-		trace(1, "cb VfoB freq -> VfoA freq");
-	} else {
-		if (Fl::event_button() == FL_RIGHT_MOUSE) {
-			xcvr.change = A2B;
-			trace(1, "cb Active->Inactive vfo");
-		} else {
+	if (Fl::event_button() == FL_RIGHT_MOUSE)
+		xcvr.change = A2B;
+	else {
+		if ((Fl::event_state() & FL_SHIFT) == FL_SHIFT)
+			xcvr.change = FA2FB;
+		else if ((Fl::event_state() & FL_CTRL) == FL_CTRL)
+			xcvr.change = FB2FA;
+		else
 			xcvr.change = SWAP;
-			trace(1, "cb SWAP");
-		}
-		serviceXCVR(xcvr);
 	}
+	serviceXCVR(xcvr);
 }
 
 void execute_A2B()
