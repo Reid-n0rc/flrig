@@ -10,7 +10,8 @@
   FLTK_CONFIG=$PREFIX/i686-w64-mingw32.static/bin/fltk-config \
   CXXFLAGS="-std=c++11 -std=gnu++11" 
 
-make -j 6
+make -j 12
+
 $PREFIX/bin/i686-w64-mingw32.static-strip src/flrig.exe
 make nsisinst
 mv src/*setup*exe .
