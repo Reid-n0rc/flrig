@@ -1864,7 +1864,11 @@ extern bool xmlrpc_pending;
 
 			while ( tx_polling->poll != NULL ) {
 				Fl::awake();
-				if (xmlrpc_pending || !PTT) break;
+				if (xmlrpc_pending ||
+					!(PTT ||
+					  (cwio_process == SEND) ||
+					  (cwio_process == CALIBRATE) ||
+					  (cwio_process == KEYDOWN) )) break;
 				if (*tx_polling->poll)  {
 					guard_lock lk( &mutex_serial,
 						std::string(__func__).append(" ").append(tx_polling->name));
