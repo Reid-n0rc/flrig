@@ -274,6 +274,7 @@ void init_linux_port_combos() {
 		"/dev/ttyACM%u",
 		"/dev/usb/ttyACM%u",
 		"/dev/rfcomm%u",
+		"/dev/pts/%u",
 		"/opt/vttyS%u"
 	};
 	char ttyname[512];
