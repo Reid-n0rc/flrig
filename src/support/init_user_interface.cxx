@@ -1805,8 +1805,10 @@ void TRACED(init_if_shift_control)
 			sldrINNER->redraw();
 			sldrOUTER->value(progStatus.pbt_outer);
 			sldrOUTER->redraw();
-			selrig->set_pbt_outer(progStatus.pbt_outer);
-			selrig->set_pbt_inner(progStatus.pbt_inner);
+// these are being sent before the xcvr is opened to receive data
+// belongs in xcvr initialization
+//			selrig->set_pbt_outer(progStatus.pbt_outer);
+//			selrig->set_pbt_inner(progStatus.pbt_inner);
 		}
 	}
 

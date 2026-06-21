@@ -3968,10 +3968,25 @@ static std::string recv_hex(std::string s)
 	unsigned int C;
 	for (size_t n = 0; n < s.length(); n += 3) {
 		hexval = s.substr(n, 3);
-		sscanf(hexval.c_str(), " %2X", &C);
+		sscanf(hexval.c_str(), "x%2X", &C);
 		recv += C & 0xFF;
 	}
 	return recv;
+}
+
+std::string hex_string(std::string s)
+{
+	const char ch[17] = "0123456789ABCDEF";
+	std::string hex;
+	if (s.find('x') == std::string::npos) return s;
+
+	for (size_t n = 0; n < s.length(); ++n) {
+		hex.append("x");
+		hex += ch[ ((s[n] >> 4) & 0xF) ];
+		hex += ch[ s[n] & 0xF ];
+		hex += " ";
+	}
+	return hex;
 }
 
 class rig_cmd_string : public XmlRpcServerMethod {
@@ -4022,6 +4037,8 @@ public:
 
 		std::string cmd = recv_hex(command);
 
+std::cout << "cat string: " << hex_string(command) << std::endl;
+std::cout << "converts to: " << hex_string(cmd) << std::endl;
 		{
 			guard_lock lock2(&mutex_serial, "xml cat string");
 

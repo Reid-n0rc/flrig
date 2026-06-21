@@ -557,7 +557,7 @@ unsigned long long RIG_IC7300::get_vfoA ()
 	cmd.append(post);
 
 	ret = waitFOR(12, "get vfo A");
-//	igett("vfo A");
+	igett("vfo A");
 
 	if (ret) {
 		size_t p = replystr.rfind(resp);
@@ -574,7 +574,6 @@ unsigned long long RIG_IC7300::get_vfoA ()
 
 void RIG_IC7300::set_vfoA (unsigned long long freq)
 {
-//	set_trace(1, "set_vfoA()");
 	A.freq = freq;
 
 	cmd.assign(pre_to).append("\x25");
@@ -607,7 +606,7 @@ unsigned long long RIG_IC7300::get_vfoB ()
 	cmd.append(post);
 
 	ret = waitFOR(12, "get vfo B");
-//	igett("vfo B");
+	igett("vfo B");
 
 	if (ret) {
 		size_t p = replystr.rfind(resp);
@@ -624,7 +623,6 @@ unsigned long long RIG_IC7300::get_vfoB ()
 
 void RIG_IC7300::set_vfoB (unsigned long long freq)
 {
-//	set_trace(1, "set_vfoB()");
 	B.freq = freq;
 
 	cmd.assign(pre_to).append("\x25");
@@ -1014,7 +1012,6 @@ bool RIG_IC7300::can_split()
 
 void RIG_IC7300::set_split(bool val)
 {
-//	set_trace(1, "set_split()");
 	split = val;
 	cmd = pre_to;
 	cmd += 0x0F;
@@ -1522,8 +1519,8 @@ void RIG_IC7300::set_cw_vol()
 {
 	cmd.assign(pre_to);
 	cmd.append("\x1A\x05");
-	cmd += '\x00';
-	cmd += '\x24';
+	cmd += '\x01';
+	cmd += '\x58';
 	cmd.append(to_bcd((int)(progStatus.cw_vol * 2.55), 3));
 	cmd.append( post );
 	set_trace(1, "set cw sideband volume");
@@ -1554,7 +1551,7 @@ int RIG_IC7300::get_PTT()
 	cmd.append(post);
 
 	ret = waitFOR(8, "get PTT");
-//	igett("ptt");
+	igett("ptt");
 
 	if (ret) {
 		size_t p = replystr.rfind(resp);
@@ -1634,7 +1631,7 @@ double RIG_IC7300::get_power_control()
 	resp.append(cstr);
 
 	ret = waitFOR(9, "get power");
-//	igett("power control");
+	igett("power control");
 
 	if (ret) {
 		size_t p = replystr.rfind(resp);
@@ -2585,7 +2582,6 @@ void RIG_IC7300::get_band_selection(int v)
 
 void RIG_IC7300::set_band_selection(int v)
 {
-//	set_trace(1, "set_band_selection()");
 	unsigned long long freq = (inuse == onB ? B.freq : A.freq);
 	int fil = (inuse == onB ? B.filter : A.filter);
 	int mode = (inuse == onB ? B.imode : A.imode);
