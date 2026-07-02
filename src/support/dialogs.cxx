@@ -1397,10 +1397,10 @@ void openMemoryDialog()
 void showme(char ch)
 {
 	return;
-	std::cout << "Schema " << ch << std::endl;
-	std::cout << "Fl::h() : " << Fl::h() << std::endl;
-	std::cout << " X: " << mainwindow->x() << ",  Y: " << mainwindow->y() << ",  W: " << mainwindow->w() << ",  H: " << mainwindow->h() << std::endl;
-	std::cout << "sX:" << progStatus.mainX << ", sY: " << progStatus.mainY << ", sW: " << progStatus.mainW << ", sH: " << progStatus.mainH << std::endl;
+//	std::cout << "Schema " << ch << std::endl;
+//	std::cout << "Fl::h() : " << Fl::h() << std::endl;
+//	std::cout << " X: " << mainwindow->x() << ",  Y: " << mainwindow->y() << ",  W: " << mainwindow->w() << ",  H: " << mainwindow->h() << std::endl;
+//	std::cout << "sX:" << progStatus.mainX << ", sY: " << progStatus.mainY << ", sW: " << progStatus.mainW << ", sH: " << progStatus.mainH << std::endl;
 }
 
 static bool restore_position = false;
@@ -1878,9 +1878,9 @@ void cb_send_command(std::string command, Fl_Output *resp, bool expect)
 {
 	if (command == "PRINT") {
 		fl_alert2("%s", print_all().c_str());
-#ifndef __WIN32__
-		std::cout << print_all();
-#endif
+//#ifndef __WIN32__
+//		std::cout << print_all();
+//#endif
 		return;
 	}
 	if (command.empty()) return;

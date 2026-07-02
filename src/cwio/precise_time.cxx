@@ -47,7 +47,7 @@ double monotonic_seconds()
 #define NANOS_PER_SECF 1000000000.0
 #define USECS_PER_SEC 1000000
 
-static bool showme = false;
+//static bool showme = false;
 
 #if _POSIX_TIMERS > 0 && defined(_POSIX_MONOTONIC_CLOCK)
 	// If we have it, use clock_gettime and CLOCK_MONOTONIC.
@@ -55,10 +55,10 @@ static bool showme = false;
 	#include <time.h>
 
 	double monotonic_seconds() {
-		if (showme) {
-			std::cout << "clock_gettime" << std::endl;
-			showme = false;
-		}
+//		if (showme) {
+//			std::cout << "clock_gettime" << std::endl;
+//			showme = false;
+//		}
 		struct timespec time;
 		// Note: Make sure to link with -lrt to define clock_gettime.
 		clock_gettime(CLOCK_MONOTONIC, &time);
@@ -155,10 +155,10 @@ static bool showme = false;
 	}
 
 	double monotonic_seconds() {
-		if (showme) {
-			std::cout << "rdtsc" << std::endl;
-			showme = false;
-		}
+//		if (showme) {
+//			std::cout << "rdtsc" << std::endl;
+//			showme = false;
+//		}
 		return (double) rdtsc() / (double) rdtsc_per_sec;
 	}
 

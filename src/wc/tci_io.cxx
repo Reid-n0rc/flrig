@@ -80,11 +80,11 @@ TCI_VALS slice_0, slice_1;
 
 void print_vals(TCI_VALS &slice)
 {
-	std::cout << "A: " << slice.A.freq << ", " << slice.A.bw << ", " << slice.A.mod << ", " << slice.A.smeter << std::endl;
-	std::cout << "B: " << slice.B.freq << ", " << slice.B.bw << ", " << slice.B.mod << ", " << slice.B.smeter << std::endl;
-	std::cout << "Volume: " << slice.vol << std::endl;
-	std::cout << "PTT: " << slice.ptt << std::endl;
-	std::cout << "Power: " << slice.pwr << std::endl;
+	//std::cout << "A: " << slice.A.freq << ", " << slice.A.bw << ", " << slice.A.mod << ", " << slice.A.smeter << std::endl;
+	//std::cout << "B: " << slice.B.freq << ", " << slice.B.bw << ", " << slice.B.mod << ", " << slice.B.smeter << std::endl;
+	//std::cout << "Volume: " << slice.vol << std::endl;
+	//std::cout << "PTT: " << slice.ptt << std::endl;
+	//std::cout << "Power: " << slice.pwr << std::endl;
 }
 
 using WSclient::WebSocket;
@@ -102,7 +102,7 @@ void handle_message(const std::string & message)
 		rx[n] = toupper(rx[n] & 0xFF);
 
 #ifdef TCI_DEBUG
-std::cout << "R: " << rx << std::endl;
+//std::cout << "R: " << rx << std::endl;
 #endif
 
 	if ((p = rx.find("RX_SMETER:")) != std::string::npos) { // smeter reading

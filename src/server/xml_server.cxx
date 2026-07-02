@@ -4037,8 +4037,6 @@ public:
 
 		std::string cmd = recv_hex(command);
 
-std::cout << "cat string: " << hex_string(command) << std::endl;
-std::cout << "converts to: " << hex_string(cmd) << std::endl;
 		{
 			guard_lock lock2(&mutex_serial, "xml cat string");
 

@@ -56,9 +56,9 @@
 
 std::string tracestring;
 
-bool stdout_trace = 
+//bool stdout_trace = 
 //	true;
-	false;
+//	false;
 
 bool pausetrace = false;
 bool recordtrace = false;
@@ -144,10 +144,10 @@ static void update_tracetext(void *)
 void write_tracetext(std::string s)
 {
 	if (s.rfind('\n') != s.length() - 1) s.append("\n"); 
-	if (stdout_trace) {
-		std::cout << s;
-		std::cout.flush();
-	}
+//	if (stdout_trace) {
+//		std::cout << s;
+//		std::cout.flush();
+//	}
 	write_trace_file( s);
 
 // send to main loop ... needs lock

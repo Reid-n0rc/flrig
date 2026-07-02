@@ -347,7 +347,7 @@ hid_device_info  *hid_enumerate(unsigned short vendor_id, unsigned short product
 			cur_dev->str_manufacturer_string = buf;
 
 			get_product_string(dev, buf, BUF_LEN);
-std::cout << buf << std::endl;
+//std::cout << buf << std::endl;
 
 			cur_dev->str_product_string = buf;
 

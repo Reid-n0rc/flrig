@@ -520,7 +520,7 @@ int start_cwio_thread()
 	if (pthread_create(&cwio_pthread, NULL, cwio_loop, NULL) < 0) {
 		pthread_mutex_destroy(&cwio_mutex);
 		LOG_ERROR("cwio thread create fail (pthread_create)");
-		std::cout << __LINE__ << " : errno " << errno << ", " << strerror(errno) << std::endl;
+//		std::cout << __LINE__ << " : errno " << errno << ", " << strerror(errno) << std::endl;
 		return 1;
 	}
 
