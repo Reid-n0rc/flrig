@@ -428,6 +428,10 @@ size_t RIG_FT710::last_frame(const char *prefix, size_t length)
 	size_t pos = replystr.rfind(prefix);
 	if (pos == std::string::npos || pos + length > replystr.length() ||
 		replystr[pos + length - 1] != ';') {
+/// an empty reply is already logged by wait_char as a timeout
+		if (!replystr.empty()) {
+			LOG_WARN("no %s reply in \"%s\"", prefix, replystr.c_str());
+		}
 		return std::string::npos;
 	}
 	return pos;
@@ -706,22 +710,30 @@ int RIG_FT710::get_swr()
 {
 	int mtr = read_meter(6, "get swr");
 
-	return (int)round(meter_value(SWR_TABLE,
+	int bar = (int)round(meter_value(SWR_TABLE,
 		sizeof(SWR_TABLE) / sizeof(meterpair), mtr));
+	LOG_DEBUG("RM6 %d = SWR bar %d", mtr, bar);
+	return bar;
 }
 
 double RIG_FT710::get_idd()
 {
 	int mtr = read_meter(7, "get idd");
 
-	return meter_value(IDD_TABLE, sizeof(IDD_TABLE) / sizeof(meterpair), mtr);
+	double amps = meter_value(IDD_TABLE,
+		sizeof(IDD_TABLE) / sizeof(meterpair), mtr);
+	LOG_DEBUG("RM7 %d = %.1f A", mtr, amps);
+	return amps;
 }
 
 double RIG_FT710::get_voltmeter()
 {
 	int mtr = read_meter(8, "get vdd");
 
-	return meter_value(VDD_TABLE, sizeof(VDD_TABLE) / sizeof(meterpair), mtr);
+	double volts = meter_value(VDD_TABLE,
+		sizeof(VDD_TABLE) / sizeof(meterpair), mtr);
+	LOG_DEBUG("RM8 %d = %.2f V", mtr, volts);
+	return volts;
 }
 
 
@@ -729,15 +741,19 @@ int RIG_FT710::get_power_out()
 {
 	int mtr = read_meter(5, "get pout");
 
-	return (int)round(meter_value(POWER_TABLE,
+	int watts = (int)round(meter_value(POWER_TABLE,
 		sizeof(POWER_TABLE) / sizeof(meterpair), mtr));
+	LOG_DEBUG("RM5 %d = %d W", mtr, watts);
+	return watts;
 }
 
 int RIG_FT710::get_alc()
 {
 	int mtr = read_meter(4, "get alc");
 
-	return (int)ceil(mtr / 2.56);
+	int alc = (int)ceil(mtr / 2.56);
+	LOG_DEBUG("RM4 %d = ALC %d", mtr, alc);
+	return alc;
 }
 
 // Transceiver power level
@@ -1601,6 +1617,11 @@ void RIG_FT710::set_break_in()
 
 int RIG_FT710::get_break_in()
 {
+/// the FT-710 answers BI only in CW; in other modes it answers ?;
+	int mode = (inuse == onB) ? modeB : modeA;
+	if (mode != mCW_U && mode != mCW_L) {
+		return progStatus.break_in;
+	}
 	cmd = "BI;";
 	wait_char(';', 4, 100, "get break in", ASC);
 	size_t pos = last_frame("BI", 4);
