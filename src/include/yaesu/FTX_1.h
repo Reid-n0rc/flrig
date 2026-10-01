@@ -159,7 +159,6 @@ public:
 
 	void set_vox_onoff();
 	void set_vox_gain();
-	void set_vox_anti();
 	void set_vox_hang();
 	void set_vox_on_dataport();
 

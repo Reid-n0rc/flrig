@@ -211,7 +211,6 @@ RIG_FTX_1::RIG_FTX_1() {
 	has_extras =
 	has_vox_onoff =
 	has_vox_gain =
-	has_vox_anti =
 	has_vox_hang =
 	has_vox_on_dataport =
 
@@ -307,7 +306,6 @@ void RIG_FTX_1::initialize()
 		progStatus.cw_wpm = 18;
 		progStatus.vox_on_dataport = false;
 		progStatus.vox_gain = 50;
-		progStatus.vox_anti = 50;
 		progStatus.vox_hang = 500;
 	}
 // Disable Auto Information mode
@@ -1422,18 +1420,12 @@ int  RIG_FTX_1::get_squelch()
 }
 
 
-// NEED
-// bool RIG_FTX_1::get_vox_onoff()
-
-// EX1616 VOX SELECT      0: MIC 1: DATA
-// EX1617 VOX GAIN        0 - 100 (P2= 000 - 100)
-// VG     VOX GAIN        0 - 100 (P2= 000 - 100)
-// EX1618 VOX DELAY       30 - 3000 msec (P2= 0030 - 3000) (10 msec/step)
-// EX1619 ANTI VOX GAIN   0 - 100 (P2= 000 - 100)
-
-// EX1620 DATA VOX GAIN   0 - 100 (P2= 000 - 100)
-// EX1621 DATA VOX DELAY  30 - 3000 msec (P2= 0030 - 3000)
-// EX1622 ANTI DVOX GAIN  0 - 100 (P2= 000 - 100)
+// VX     VOX on/off
+// VG     VOX GAIN 000 - 100
+// VD     VOX DELAY, 2 digit code (see FTX_1_DELAY_MSEC)
+// EX030510 VOX SELECT 0: MIC, 1: USB, 2: Bluetooth
+// VG and VD apply to the input chosen by VOX SELECT.
+// The FTX-1 has no anti-VOX setting available over CAT.
 
 void RIG_FTX_1::set_vox_onoff()
 {
@@ -1447,24 +1439,7 @@ void RIG_FTX_1::set_vox_onoff()
 
 void RIG_FTX_1::set_vox_gain()
 {
-	if (progStatus.vox_on_dataport)
-		cmd = "EX1620";
-	else
-		cmd = "VG";
-	cmd.append(to_decimal(progStatus.vox_gain, 3)).append(";");
-	set_trace(1, __func__);
-	sendCommand(cmd);
-	sett("");
-	showresp(WARN, ASC, __func__, cmd, replystr);
-}
-
-void RIG_FTX_1::set_vox_anti()
-{
-	if (progStatus.vox_on_dataport)
-		cmd = "EX1622";
-	else
-		cmd = "EX1619";
-	cmd.append(to_decimal(progStatus.vox_anti, 3)).append(";");
+	cmd.assign("VG").append(to_decimal(progStatus.vox_gain, 3)).append(";");
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
@@ -1473,11 +1448,8 @@ void RIG_FTX_1::set_vox_anti()
 
 void RIG_FTX_1::set_vox_hang()
 {
-	if (progStatus.vox_on_dataport)
-		cmd = "EX1621";
-	else
-		cmd = "VD";
-	cmd.append(to_decimal(progStatus.vox_hang, 4)).append(";");
+	cmd.assign("VD").append(to_decimal(delay_code(progStatus.vox_hang), 2));
+	cmd.append(";");
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
@@ -1486,8 +1458,10 @@ void RIG_FTX_1::set_vox_hang()
 
 void RIG_FTX_1::set_vox_on_dataport()
 {
-	cmd = "EX16160;";
-	if (progStatus.vox_on_dataport) cmd[6] = '1';
+	cmd = "EX0305100;";
+	if (progStatus.vox_on_dataport) {
+		cmd[8] = '1';
+	}
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
