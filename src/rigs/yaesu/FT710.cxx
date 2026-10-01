@@ -784,15 +784,15 @@ int RIG_FT710::get_volume_control()
 	}
 	int val = 0;
 	sscanf(&replystr[pos], "AG0%d", &val);
-	val *= 100;
-	val /= 255;
+	val = (int)round(val * 100 / 255.0);
 	if (val > 100) val = 100;
 	return val;
 }
 
 void RIG_FT710::set_volume_control(int val) 
 {
-	int ivol = (int)(val * 250 / 100);
+/// AF GAIN is 000-255 (manual p.6)
+	int ivol = (int)round(val * 255 / 100.0);
 	cmd = "AG0000;";
 	for (int i = 5; i > 2; i--) {
 		cmd[i] += ivol % 10;
@@ -1439,7 +1439,8 @@ void RIG_FT710::get_mic_min_max_step(int &min, int &max, int &step)
 void RIG_FT710::set_rf_gain(int val)
 {
 	cmd = "RG0000;";
-	int rfval = val * 250 / 100;
+/// RF GAIN is 000-255 (manual p.19)
+	int rfval = (int)round(val * 255 / 100.0);
 	for (int i = 5; i > 2; i--) {
 		cmd[i] = rfval % 10 + '0';
 		rfval /= 10;
@@ -1463,7 +1464,7 @@ int  RIG_FT710::get_rf_gain()
 		rfval *= 10;
 		rfval += replystr[p+i] - '0';
 	}
-	rfval = rfval * 100 / 250;
+	rfval = (int)round(rfval * 100 / 255.0);
 	if (rfval > 100) rfval = 100;
 	return rfval;
 }
@@ -1491,8 +1492,19 @@ void RIG_FT710::set_vox_gain()
 	showresp(WARN, ASC, "SET vox gain", cmd, replystr);
 }
 
+/// ANTI VOX LEVEL, AV 001-100 (manual p.7)
 void RIG_FT710::set_vox_anti()
 {
+	int level = progStatus.vox_anti;
+	if (level < 1) {
+		level = 1;
+	}
+	if (level > 100) {
+		level = 100;
+	}
+	cmd.assign("AV").append(to_decimal(level, 3)).append(";");
+	sendCommand(cmd);
+	showresp(WARN, ASC, "SET anti-vox", cmd, replystr);
 }
 
 void RIG_FT710::set_vox_hang()
