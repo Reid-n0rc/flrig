@@ -27,6 +27,13 @@ class RIG_FT891 : public rigbase {
 private:
 	bool notch_on;
 	int  m_60m_indx;
+
+/// BFO menu values found in the xcvr before flrig first changed them,
+/// -1 if not yet read
+	int  m_bfo_orig[4];
+
+	int  bfo_index(int mode);
+	bool bfo_is_lsb(int value, unsigned long long frequency);
 protected:
 	int  preamp_level;
 	int  atten_level;
@@ -36,6 +43,7 @@ public:
 
 	void initialize();
 	void post_initialize();
+	void shutdown();
 
 	bool check();
 
@@ -59,8 +67,8 @@ public:
 	void set_split(bool val);
 	int  get_split();
 
-	int get_sideband(int md);
-	void set_sideband(int md);
+	int get_sideband(int mode);
+	void set_sideband(int mode);
 
 	void set_modeA(int val);
 	int  get_modeA();
