@@ -138,6 +138,11 @@ public:
 	virtual void set_vox_onoff();
 	virtual void set_vox_gain();
 	virtual void set_vox_anti();
+	virtual void get_vox_anti_min_max_step(int &min, int &max, int &step) {
+		min = 1; max = 100; step = 1; }
+	virtual void get_vox_anti_min_max_step(
+		double &min, double &max, double &step) {
+		min = 1; max = 100; step = 1; }
 	virtual void set_vox_hang();
 	virtual void set_vox_on_dataport();
 
