@@ -24,9 +24,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <map>
+
 #include "threads.h"
 #include "util.h"
 #include "support.h"
+#include "debug.h"
 
 /// This ensures that a mutex is always unlocked when leaving a function or block.
 
@@ -37,14 +40,79 @@ extern pthread_mutex_t debug_mutex;
 extern pthread_mutex_t mutex_rcv_socket;
 extern pthread_mutex_t mutex_trace;
 
-guard_lock::guard_lock(pthread_mutex_t* m, std::string h, long tout) : mutex(m) {
+/// thread and purpose of a guard_lock that holds a mutex
+struct lock_owner {
+	pthread_t thread;
+	std::string how;
+};
+
+/// threads that hold a mutex through a guard_lock, so that a nested
+/// guard_lock on the same mutex in the same thread neither deadlocks
+/// nor releases the outer lock, and a wait can be logged with the
+/// holder's purpose
+typedef std::map<pthread_mutex_t *, lock_owner> LOCK_OWNER_MAP;
+static LOCK_OWNER_MAP lock_owners;
+static pthread_mutex_t mutex_lock_owners = PTHREAD_MUTEX_INITIALIZER;
+
+static bool held_by_this_thread(pthread_mutex_t *mutex)
+{
+	pthread_mutex_lock(&mutex_lock_owners);
+	LOCK_OWNER_MAP::iterator it = lock_owners.find(mutex);
+	bool held = (it != lock_owners.end()) &&
+		pthread_equal(it->second.thread, pthread_self());
+	pthread_mutex_unlock(&mutex_lock_owners);
+	return held;
+}
+
+/// purpose given by the guard_lock that holds mutex, if any
+static std::string lock_holder(pthread_mutex_t *mutex)
+{
+	pthread_mutex_lock(&mutex_lock_owners);
+	LOCK_OWNER_MAP::iterator it = lock_owners.find(mutex);
+	std::string holder = (it == lock_owners.end()) ? "?" : it->second.how;
+	pthread_mutex_unlock(&mutex_lock_owners);
+	return holder;
+}
+
+static void set_lock_owner(pthread_mutex_t *mutex, const std::string &how)
+{
+	pthread_mutex_lock(&mutex_lock_owners);
+	lock_owner owner;
+	owner.thread = pthread_self();
+	owner.how = how;
+	lock_owners[mutex] = owner;
+	pthread_mutex_unlock(&mutex_lock_owners);
+}
+
+static void clear_lock_owner(pthread_mutex_t *mutex)
+{
+	pthread_mutex_lock(&mutex_lock_owners);
+	lock_owners.erase(mutex);
+	pthread_mutex_unlock(&mutex_lock_owners);
+}
+
+guard_lock::guard_lock(pthread_mutex_t* m, std::string h, long tout) :
+	mutex(m), m_locked(false) {
 
 	how.clear();
 	how = h;
 	time_out = tout;
 	start_time = zmsec();
+
+	if (held_by_this_thread(mutex)) {
+		std::string sznested = name(mutex);
+		sznested.append(" nested lock, already held");
+		if (!h.empty()) {
+			sznested.append(", ").append(h);
+		}
+		lock_trace(1, sznested.c_str());
+		return;
+	}
+
 	for (int i = 0; i < 20; i++) {
 		if (pthread_mutex_trylock(mutex) == 0) {
+			set_lock_owner(mutex, h);
+			m_locked = true;
 			std::string szlock = name(mutex);
 			szlock.append(" try lock ");
 			if (!h.empty()) {
@@ -57,12 +125,27 @@ guard_lock::guard_lock(pthread_mutex_t* m, std::string h, long tout) : mutex(m) 
 		MilliSleep(50);
 	}
 
-	std::string szlock;;
+/// another thread still holds the mutex; wait for it rather than run
+/// without the lock, which lets two threads talk to the transceiver
+/// at once
+	std::string szlock;
 	szlock.assign("lock FAILED ").append(name(mutex));
-	if (!h.empty())
+	if (!h.empty()) {
 		szlock.append(", ").append(h);
+	}
+	szlock.append(", waiting");
 	failure_trace(1, szlock.c_str());
 
+	std::string holder = lock_holder(mutex);
+	LOG_WARN("%s: waiting for %s, held by %s",
+		h.c_str(), name(mutex), holder.c_str());
+
+	pthread_mutex_lock(mutex);
+	set_lock_owner(mutex, h);
+	m_locked = true;
+
+	LOG_WARN("%s: got %s after %ld msec",
+		h.c_str(), name(mutex), (long)(zmsec() - start_time));
 }
 
 guard_lock::~guard_lock(void) {
@@ -77,6 +160,10 @@ guard_lock::~guard_lock(void) {
 		failure_trace(1, szlock);
 	}
 
+	if (!m_locked) {
+		return;
+	}
+	clear_lock_owner(mutex);
 	pthread_mutex_unlock(mutex);
 }
 
