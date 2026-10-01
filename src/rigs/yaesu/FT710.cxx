@@ -119,19 +119,16 @@ static const char *vfmd[]  = { "16000" };
 static std::vector<std::string>FT710_widths_DATA_FMN;
 static const char *vfmdn[] = { "9000" };
 
-// US has 5 60M presets. Using dummy numbers for all.
-// First "" means skip 60m sets in get_band_selection().
-// Maybe someone can do a cat command MC; on all 5 presets and add returned numbers above.
-// To send cat commands in flrig goto menu Config->Xcvr select->Send Cmd.
-//
-// UK has 7 60M presets. Using dummy numbers for all.  If you want support,
-// Maybe someone can do a cat command MC; on all 7 presets and add returned numbers below.
-// static const char *FT710_UK_60m[] = {"", "126", "127", "128", "130", "131", "132"};
-
-static std::vector<std::string>FT710_US_60m;
-static const char *v60m[] = {"", "126", "127", "128", "130"};
-
-static std::vector<std::string>& Channels_60m = FT710_US_60m;
+/// 60 m combo entries: VFO selects the 5 MHz band (BS02), the others
+/// are the radio's 5 MHz memory channels, MC 5xx (manual p.15).  A US
+/// FT-710 has 501-505 at 5330.5, 5346.5, 5357.0, 5371.5 and 5403.5 kHz
+/// USB, and 506-510 at the same channels 1.5 kHz up in CW.  The radio
+/// holds the frequencies, so only the channel numbers are listed here.
+static std::vector<std::string>FT710_60m;
+static const char *v60m[] = {
+	"VFO", "501", "502", "503", "504", "505",
+	"506", "507", "508", "509", "510"
+};
 
 //----------------------------------------------------------------------
 static std::vector<std::string>FT710_att_labels;
@@ -179,7 +176,7 @@ void RIG_FT710::initialize()
 	VECTOR(FT710_widths_FMwide, vfmw);
 	VECTOR(FT710_widths_DATA_FM, vfmd);
 	VECTOR(FT710_widths_DATA_FMN, vfmdn);
-	VECTOR(FT710_US_60m, v60m);
+	VECTOR(FT710_60m, v60m);
 
 	VECTOR (FT710_att_labels, vFT710_att_labels);
 	att_labels_ = FT710_att_labels;
@@ -214,6 +211,13 @@ void RIG_FT710::initialize()
 	sett("Auto Info OFF");
 
 	set_cw_spot();
+
+	op_yaesu_select60->clear();
+	for (size_t entry = 0; entry < FT710_60m.size(); entry++) {
+		op_yaesu_select60->add(FT710_60m[entry].c_str());
+	}
+	op_yaesu_select60->index(m_60m_indx);
+	op_yaesu_select60->activate();
 
 	get_vfoAorB();
 }
@@ -360,34 +364,38 @@ void RIG_FT710::set_xcvr_auto_off()
 	}
 }
 
+/// Band buttons 1-11 (1.8 MHz to GEN) select band stacks BS00-BS11,
+/// skipping BS02; the 60 m combo calls with 13.
 void RIG_FT710::get_band_selection(int v)
 {
-	int inc_60m = false;
 	cmd = "IF;";
 	wait_char(';', 28, 100, "get band", ASC);
 
 	sett("get band");
 
-	size_t p = replystr.rfind("IF");
-	if (p == std::string::npos) return;
-	if (replystr[p+22 ] != '0') {	// vfo 60M memory mode
-		inc_60m = true;
+	size_t pos = last_frame("IF", 28);
+	if (pos == std::string::npos) {
+		return;
+	}
+/// IF P7 is 0 for VFO, otherwise a memory channel is in use
+	if (replystr[pos + 22] != '0') {
+		cmd = "VM;";
+		sendCommand(cmd);
+		showresp(WARN, ASC, "VFO mode", cmd, replystr);
 	}
 
-	if (v == 12) {	// 5MHz 60m presets
-		if (Channels_60m[0].empty()) return;	// no 60m Channels so skip
-		if (inc_60m) {
-			if (++m_60m_indx > (int)Channels_60m.size()) m_60m_indx = 0;
+	if (v == 13) {
+		m_60m_indx = op_yaesu_select60->index();
+		if (m_60m_indx > 0 && m_60m_indx < (int)FT710_60m.size()) {
+			cmd.assign("MC").append(FT710_60m[m_60m_indx]).append(";");
+		} else {
+			cmd = "BS02;";
 		}
-		cmd.assign("MC").append(Channels_60m[m_60m_indx]).append(";");
-	} else {		// v == 1..11 band selection OR return to vfo mode == 0
-		if (inc_60m)
-			cmd = "VM;";
-		else {
-			if (v < 3)
-				v = v - 1;
-			cmd.assign("BS").append(to_decimal(v, 2)).append(";");
+	} else {
+		if (v < 3) {
+			v = v - 1;
 		}
+		cmd.assign("BS").append(to_decimal(v, 2)).append(";");
 	}
 
 	sendCommand(cmd);
