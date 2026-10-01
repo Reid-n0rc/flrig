@@ -1302,6 +1302,10 @@ bool RIG_FTX_1::get_if_shift(int &val)
 	gett("");
 
 	size_t p = replystr.rfind("IS");
+	if (p == std::string::npos) {
+		val = progStatus.shift_val;
+		return true;
+	}
 
 	char sub = '0';
 	int sh = progStatus.shift_val;
@@ -1355,21 +1359,22 @@ bool  RIG_FTX_1::get_notch(int &val)
 	gett("");
 
 	size_t p = replystr.rfind("BP");
-	if (p == std::string::npos) return ison;
+	if (p == std::string::npos || p + 6 >= replystr.length()) {
+		return ison;
+	}
 
 	if (replystr[p+6] == '1') { // manual notch enabled
 		ison = true;
 		val = progStatus.notch_val;
-		cmd = "BP01";
+		cmd = "BP01;";
 		cmd[2] = active_side();
 		get_trace(1, "get notch value()");
 		wait_char(';',8, FTX_1_WAIT_TIME, "get notch val", ASC);
 		gett("");
 		p = replystr.rfind("BP");
-		if (p == std::string::npos)
-			val = 10;
-		else
+		if (p != std::string::npos && p + 6 < replystr.length()) {
 			val = fm_decimal(replystr.substr(p+4), 3) * 10;
+		}
 	}
 	return ison;
 }
@@ -1576,6 +1581,9 @@ int  RIG_FTX_1::get_squelch()
 	gett("");
 
 	size_t p = replystr.rfind("SQ");
+	if (p == std::string::npos) {
+		return progStatus.squelch;
+	}
 	char sub_side = '0';
 	int level = 0;
 	sscanf(&replystr[p], "SQ%c%d;", &sub_side, &level);
@@ -1644,15 +1652,24 @@ void RIG_FTX_1::set_cw_wpm()
 	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
+// ML0 monitor on/off: 000 off, 001 on
+// ML1 monitor level 000 - 100
 void RIG_FTX_1::set_cw_vol()
 {
-	if (progStatus.cw_vol == 0)
+	if (progStatus.cw_vol == 0) {
 		cmd = "ML0000;";
-	else {
-		char cmdstr[20];
-		snprintf(cmdstr, 19, "ML1%03d;", progStatus.cw_vol);
-		cmd = cmdstr;
+	} else {
+		cmd = "ML0001;";
 	}
+	set_trace(1, __func__);
+	sendCommand(cmd);
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
+
+	if (progStatus.cw_vol == 0) {
+		return;
+	}
+	cmd.assign("ML1").append(to_decimal(progStatus.cw_vol, 3)).append(";");
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
@@ -1661,20 +1678,30 @@ void RIG_FTX_1::set_cw_vol()
 
 int  RIG_FTX_1::get_cw_vol()
 {
-	cmd = "ML1;";
-
+	cmd = rsp = "ML0";
+	cmd += ';';
 	get_trace(1, __func__);
 	wait_char(';', 7, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
-	size_t p = replystr.rfind("ML");
-	if (p == std::string::npos) return progStatus.cw_vol;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 6 >= replystr.length()) {
+		return progStatus.cw_vol;
+	}
+	if (replystr.substr(pos + 3, 3) == "000") {
+		return 0;
+	}
 
-	char mon = 0;
-	int vol = 0;
-	sscanf( &replystr[p], "ML%c%d;", &mon, &vol );
-	if (mon == 0) vol = 0;
-	progStatus.cw_vol = vol;
-	return vol;
+	cmd = rsp = "ML1";
+	cmd += ';';
+	get_trace(1, __func__);
+	wait_char(';', 7, FTX_1_WAIT_TIME, __func__, ASC);
+	gett("");
+	pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 6 >= replystr.length()) {
+		return progStatus.cw_vol;
+	}
+	progStatus.cw_vol = atoi(replystr.substr(pos + 3, 3).c_str());
+	return progStatus.cw_vol;
 }
 
 void RIG_FTX_1::enable_keyer()
@@ -1921,7 +1948,8 @@ void RIG_FTX_1::get_compression(int &on, int &val)
 void RIG_FTX_1::get_band_selection(int v)
 {
 	if (v < 3) v = v - 1;
-	cmd.assign("BS").append(to_decimal(v, 2)).append(";");
+	cmd.assign("BS").append(1, active_side());
+	cmd.append(to_decimal(v, 2)).append(";");
 	get_trace(1, __func__);
 	sendCommand(cmd);
 	gett("");
@@ -1977,7 +2005,8 @@ int  RIG_FTX_1::get_agc()
 	size_t p = replystr.rfind("GT");
 	if (p == std::string::npos) return agcval;
 
-	switch (replystr[3]) {
+	if (p + 3 >= replystr.length()) return agcval;
+	switch (replystr[p + 3]) {
 		default:
 		case '0': agcval = 0; break;
 		case '1': agcval = 1; break;
@@ -2020,7 +2049,9 @@ int  RIG_FTX_1::agc_val()
  
 void  RIG_FTX_1::zero_in()
 {
-	sendCommand("ZI;");
+	cmd = "ZI0;";
+	cmd[2] = active_side();
+	sendCommand(cmd);
 }
 
 const char * RIG_FTX_1::get_bwname_(int bw, int md) {
