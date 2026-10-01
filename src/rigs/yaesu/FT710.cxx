@@ -300,6 +300,10 @@ RIG_FT710::RIG_FT710() {
 	notch_on = false;
 	m_60m_indx = 0;
 
+	for (int meter = 0; meter < 9; meter++) {
+		m_meter_raw[meter] = 0;
+	}
+
 	inuse = onA;
 
 	can_synch_clock = true;
@@ -557,6 +561,9 @@ void RIG_FT710::swapAB()
 }
 
 
+/// S meter, SM0 (manual p.20): answer SM0 P2P2P2 ; is 7 characters.
+/// Returns -1, which leaves the S meter unchanged, when the reply is
+/// missing or is the reply to another command.
 int RIG_FT710::get_smeter()
 {
 	cmd = rsp = "SM0";
@@ -565,27 +572,50 @@ int RIG_FT710::get_smeter()
 
 	gett("get_smeter()");
 
-	if (replystr.find("SM") == std::string::npos)
-		return 0;
+	size_t pos = replystr.rfind("SM0");
+	if (pos == std::string::npos || pos + 7 > replystr.length() ||
+		replystr[pos + 6] != ';') {
+		return -1;
+	}
 
-	int mtr = 0;
-	sscanf(replystr.c_str(), "SM0%d", &mtr);
+	int mtr = atoi(replystr.substr(pos + 3, 3).c_str());
 	mtr = mtr * 100.0 / 256.0;
 	return mtr;
 }
 
+/// Read meter RM P1 (manual p.19): answer RM P1 P2P2P2 000 ; is 10
+/// characters.  Sent once; the radio answers every RM it receives, and
+/// a second answer is read by the next command.  Returns the raw value
+/// 0-255, or the last good value when the reply is missing or is the
+/// reply to another command.
+int RIG_FT710::read_meter(int meter, const char *label)
+{
+	char prefix[4];
+	snprintf(prefix, sizeof(prefix), "RM%d", meter);
+
+	cmd = rsp = prefix;
+	cmd += ';';
+	wait_char(';', 10, 100, label, ASC);
+	gett(label);
+
+	size_t pos = replystr.rfind(prefix);
+	if (pos == std::string::npos || pos + 10 > replystr.length() ||
+		replystr[pos + 9] != ';') {
+		return m_meter_raw[meter];
+	}
+	for (size_t digit = pos + 3; digit < pos + 6; digit++) {
+		if (!isdigit(replystr[digit])) {
+			return m_meter_raw[meter];
+		}
+	}
+
+	m_meter_raw[meter] = atoi(replystr.substr(pos + 3, 3).c_str());
+	return m_meter_raw[meter];
+}
+
 int RIG_FT710::get_swr()
 {
-	cmd = rsp = "RM6";
-	cmd += ';';
-	wait_char(';', 10, 100, "get swr", ASC);
-
-	gett("get_swr()");
-
-	int mtr = 0, dmy = 0;
-	size_t p = replystr.rfind("RM6");
-	if (p != std::string::npos)
-		sscanf(&replystr[p], "RM6%3d%3d", &mtr, &dmy);
+	int mtr = read_meter(6, "get swr");
 
 	return mtr / 2.56;
 }
@@ -606,49 +636,26 @@ double RIG_FT710::get_idd()
 		{ 191, 20.0 }
 	};
 
-	cmd = rsp = "RM7";
-	cmd += ';';
-	wait_char(';',10, 100, "get alc", ASC);
-	gett("get_idd");
+	int mtr = read_meter(7, "get idd");
 
-	int mtr = 0, dmy = 0;
-	double idd = 0;
-	size_t p = replystr.rfind("RM7");
-	if (p != std::string::npos) {
-		sscanf(&replystr[p], "RM7%3d%3d", &mtr, &dmy);
-		size_t i = 0;
-		for (i = 0; i < sizeof(iddtbl) / sizeof(meterpair) - 1; i++)
-			if (mtr >= iddtbl[i].mtr && mtr < iddtbl[i+1].mtr)
-				break;
-		if (mtr < 0) mtr = 0;
-		if (mtr > 191) mtr = 191;
-		idd = iddtbl[i].val +
-			  (iddtbl[i+1].val - iddtbl[i].val)*(mtr - iddtbl[i].mtr) / (iddtbl[i+1].mtr - iddtbl[i].mtr);
-		if (idd > 25) idd = 25;
-	}
+	size_t i = 0;
+	for (i = 0; i < sizeof(iddtbl) / sizeof(meterpair) - 1; i++)
+		if (mtr >= iddtbl[i].mtr && mtr < iddtbl[i+1].mtr)
+			break;
+	if (mtr < 0) mtr = 0;
+	if (mtr > 191) mtr = 191;
+	double idd = iddtbl[i].val +
+		  (iddtbl[i+1].val - iddtbl[i].val)*(mtr - iddtbl[i].mtr) / (iddtbl[i+1].mtr - iddtbl[i].mtr);
+	if (idd > 25) idd = 25;
+
 	return idd;
 }
 
 double RIG_FT710::get_voltmeter()
 {
-	cmd = "RM8;";
-	std::string resp = "RM";
+	int mtr = read_meter(8, "get vdd");
 
-	get_trace(1, "get_voltmeter()");
-	wait_char(';',10, 100, "get vdd", ASC);
-	gett("get_voltmeter");
-
-	int mtr = 0, dmy = 0;
-	double val = 0;
-
-	size_t p = replystr.rfind("RM8");
-	if (p != std::string::npos) {
-		sscanf(&replystr[p], "RM8%3d%3d", &mtr, &dmy);
-		val = 13.8 * mtr / 190;
-		return val;
-	}
-
-	return -1;
+	return 13.8 * mtr / 190;
 }
 
 
@@ -662,46 +669,25 @@ int RIG_FT710::get_power_out()
 		{205,100.0 }
 	};
 
-	cmd = rsp = "RM5";
-	sendCommand(cmd.append(";"));
-	wait_char(';', 10, 100, "get pout", ASC);
-	gett("get_power_out()");
+	int mtr = read_meter(5, "get pout");
 
-	int mtr = 0, dmy = 0;
-	double pwr = 0;
+	size_t i = 0;
+	for (i = 0; i < sizeof(pwrtbl) / sizeof(meterpair) - 1; i++)
+		if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i+1].mtr)
+			break;
+	if (mtr < 0) mtr = 0;
+	if (mtr > 205) mtr = 205;
+	double pwr = (int)ceil(pwrtbl[i].val + 
+		  (pwrtbl[i+1].val - pwrtbl[i].val)*(mtr - pwrtbl[i].mtr) / (pwrtbl[i+1].mtr - pwrtbl[i].mtr));
 
-	size_t p = replystr.rfind("RM5");
-	if (p != std::string::npos) {
-
-		sscanf(&replystr[p], "RM5%3d%3d;", &mtr, &dmy);
-
-		size_t i = 0;
-		for (i = 0; i < sizeof(pwrtbl) / sizeof(meterpair) - 1; i++)
-			if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i+1].mtr)
-				break;
-		if (mtr < 0) mtr = 0;
-		if (mtr > 205) mtr = 205;
-		pwr = (int)ceil(pwrtbl[i].val + 
-			  (pwrtbl[i+1].val - pwrtbl[i].val)*(mtr - pwrtbl[i].mtr) / (pwrtbl[i+1].mtr - pwrtbl[i].mtr));
-
-		if (pwr > 100) pwr = 100;
-
-	}
+	if (pwr > 100) pwr = 100;
 
 	return pwr;
 }
 
 int RIG_FT710::get_alc()
 {
-	cmd = rsp = "RM4";
-	cmd += ';';
-	wait_char(';',10, 100, "get alc", ASC);
-	gett("get_alc");
-
-	int mtr = 0, dmy = 0;
-	size_t p = replystr.rfind("RM4");
-	if (p != std::string::npos)
-		sscanf(&replystr[p], "RM4%3d%3d", &mtr, &dmy);
+	int mtr = read_meter(4, "get alc");
 
 	return (int)ceil(mtr / 2.56);
 }

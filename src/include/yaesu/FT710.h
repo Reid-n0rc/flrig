@@ -27,6 +27,12 @@ class RIG_FT710 : public rigbase {
 private:
 	bool notch_on;
 	int  m_60m_indx;
+
+/// last good raw reading (0-255) of each RM meter, indexed by RM P1
+	int  m_meter_raw[9];
+
+	int  read_meter(int meter, const char *label);
+
 public:
 	RIG_FT710();
 	~RIG_FT710() {}
