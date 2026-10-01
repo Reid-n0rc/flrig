@@ -41,8 +41,10 @@ private:
 	int  m_nb_level;
 	bool m_nr_on;
 	int  m_nr_level;
+	char preamp_band();
+	int  preamp_max(char band);
+	void preamp_labels(char band);
 protected:
-	int  preamp_level;
 	int  atten_level;
 public:
 	RIG_FTX_1();
@@ -119,6 +121,7 @@ public:
 	int  get_attenuator();
 	void set_preamp(int val);
 	int  get_preamp();
+	int  next_preamp();
 
 	void set_if_shift(int val);
 	bool get_if_shift(int &val);
@@ -157,7 +160,7 @@ public:
 	void set_rf_gain(int val);
 	int  get_rf_gain();
 	void get_rf_min_max_step(int &min, int &max, int &step) {
-		min = 0; max = 30; step = 1; }
+		min = 0; max = 100; step = 1; }
 
 	void set_squelch(int val);
 	int  get_squelch();

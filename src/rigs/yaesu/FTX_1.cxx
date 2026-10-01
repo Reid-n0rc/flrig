@@ -157,8 +157,13 @@ static int dsp_level(int level) {
 static std::vector<std::string>FTX_1_att_labels;
 static const char *vFTX_1_att_labels[] = { "ATT", "12 dB" };
 
+// PA P1 0 (HF/50 MHz): 0 IPO, 1 AMP1, 2 AMP2
 static std::vector<std::string>FTX_1_pre_labels;
-static const char *vFTX_1_pre_labels[] = { "Amp", "IPO" };
+static const char *vFTX_1_pre_labels[] = { "IPO", "AMP 1", "AMP 2" };
+
+// PA P1 1 (144 MHz), 2 (430 MHz): 0 off, 1 on
+static std::vector<std::string>FTX_1_pre_labels_vu;
+static const char *vFTX_1_pre_labels_vu[] = { "PRE", "PRE on" };
 //----------------------------------------------------------------------
 
 static GUI rig_widgets[]= {
@@ -263,7 +268,6 @@ RIG_FTX_1::RIG_FTX_1() {
 
 // derived specific
 	atten_level = 1;
-	preamp_level = 1;
 	notch_on = false;
 	m_60m_indx = 0;
 
@@ -286,6 +290,7 @@ void RIG_FTX_1::initialize()
 	att_labels_ = FTX_1_att_labels;
 
 	VECTOR (FTX_1_pre_labels, vFTX_1_pre_labels);
+	VECTOR (FTX_1_pre_labels_vu, vFTX_1_pre_labels_vu);
 	pre_labels_ = FTX_1_pre_labels;
 
 	modes_ = FTX_1modes_;
@@ -735,10 +740,27 @@ int RIG_FTX_1::get_PTT()
 }
 
 
-// internal or external tune mode
-void RIG_FTX_1::tune_rig(int)
+// AC P1 P2 P3
+//   P1 0 internal tuner, 1 external tuner (flrig "external tuner")
+//   P2 0 antenna tuner
+//   P3 0 off / stop, 1 on, 3 start tuning
+void RIG_FTX_1::tune_rig(int how)
 {
-	cmd = "AC012;";
+	switch (how) {
+		case 0:
+			cmd = "AC000;";
+			break;
+		case 1:
+			cmd = "AC001;";
+			break;
+		case 2:
+		default:
+			cmd = "AC003;";
+			break;
+	}
+	if (how != 0 && progStatus.external_tuner) {
+		cmd[2] = '1';
+	}
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
@@ -747,15 +769,17 @@ void RIG_FTX_1::tune_rig(int)
 
 int RIG_FTX_1::get_tune()
 {
-	cmd = "AC;";
+	cmd = rsp = "AC";
+	cmd += ';';
 	get_trace(1, __func__);
-	wait_char(';', 5, FTX_1_WAIT_TIME, __func__, ASC);
+	wait_char(';', 6, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind("AC");
-	if (p == std::string::npos) return 0;
-	int val = replystr[p+4] - '0';
-	return !(val < 2);
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 4 >= replystr.length()) {
+		return 0;
+	}
+	return replystr[pos + 4] != '0';
 }
 
 void RIG_FTX_1::set_attenuator(int val)
@@ -784,31 +808,86 @@ int RIG_FTX_1::get_attenuator()
 	return atten_level;
 }
 
+/// PA P1 for the active side's frequency: '0' HF/50, '1' 144, '2' 430
+char RIG_FTX_1::preamp_band() {
+	unsigned long long freq = freqA;
+	if (inuse == onB) {
+		freq = freqB;
+	}
+	if (freq >= 420000000ULL) {
+		return '2';
+	}
+	if (freq >= 144000000ULL) {
+		return '1';
+	}
+	return '0';
+}
+
+/// highest preamp setting: AMP2 on HF/50, on/off on 144 and 430
+int RIG_FTX_1::preamp_max(char band) {
+	if (band == '0') {
+		return 2;
+	}
+	return 1;
+}
+
+/// use the button labels for the band
+void RIG_FTX_1::preamp_labels(char band) {
+	if (band == '0') {
+		pre_labels_ = FTX_1_pre_labels;
+	} else {
+		pre_labels_ = FTX_1_pre_labels_vu;
+	}
+}
+
+int RIG_FTX_1::next_preamp()
+{
+	if (preamp_state >= preamp_max(preamp_band())) {
+		return 0;
+	}
+	return preamp_state + 1;
+}
+
 void RIG_FTX_1::set_preamp(int val)
 {
-	if (val) cmd = "PA00;";
-	else     cmd = "PA01;";
-	preamp_level = val;
-	preamp_state = (preamp_level == 0);
+	char band = preamp_band();
+	if (val < 0) {
+		val = 0;
+	}
+	if (val > preamp_max(band)) {
+		val = preamp_max(band);
+	}
+	preamp_state = val;
+	preamp_labels(band);
 
+	cmd = "PA00;";
+	cmd[2] = band;
+	cmd[3] = '0' + val;
 	set_trace(1, __func__);
-	sendCommand (cmd);
+	sendCommand(cmd);
 	sett("");
 	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FTX_1::get_preamp()
 {
-	cmd = "PA0;";
+	char band = preamp_band();
+	cmd = rsp = "PA0";
+	cmd[2] = rsp[2] = band;
+	cmd += ';';
 	get_trace(1, __func__);
-	wait_char(';',5, FTX_1_WAIT_TIME, __func__, ASC);
+	wait_char(';', 5, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind("PA0");
-	if (p == std::string::npos) return 0;
-
-	preamp_state = preamp_level = (replystr[p+3] == '0');
-	return preamp_level;
+	size_t pos = replystr.rfind(rsp);
+	if (pos != std::string::npos && pos + 3 < replystr.length()) {
+		int value = replystr[pos + 3] - '0';
+		if (value >= 0 && value <= preamp_max(band)) {
+			preamp_state = value;
+		}
+	}
+	preamp_labels(band);
+	return preamp_state;
 }
 
 /// true for modes where the FTX-1 has one fixed bandwidth and SH does
@@ -1129,11 +1208,9 @@ int RIG_FTX_1::get_modetype(int n)
 
 void RIG_FTX_1::set_if_shift(int val)
 {
-	char cmdstr[20];  // "IS00+0000;";
-	if (inuse == onA)
-		snprintf( cmdstr, sizeof(cmdstr), "IS00%+05d;", val );
-	else
-		snprintf(cmdstr, sizeof(cmdstr), "IS10%+05d;", val );
+	char cmdstr[20];
+	snprintf(cmdstr, sizeof(cmdstr), "IS%c0%+05d;", active_side(), val);
+	cmd = cmdstr;
 
 	set_trace(1, __func__);
 	sendCommand(cmd);
@@ -1373,14 +1450,12 @@ int RIG_FTX_1::get_mic_gain()
 	return ceil(val);
 }
 
+// RG P1 000 - 255, flrig slider 0 - 100
 void RIG_FTX_1::set_rf_gain(int val)
 {
-	cmd = "RG0000;";
-	cmd[2] = active_side();
-	for (int i = 5; i > 2; i--) {
-		cmd[i] = val % 10 + '0';
-		val /= 10;
-	}
+	int rf_level = round(val * 2.55);
+	cmd.assign("RG").append(1, active_side());
+	cmd.append(to_decimal(rf_level, 3)).append(";");
 
 	set_trace(1, __func__);
 	sendCommand(cmd);
@@ -1390,20 +1465,19 @@ void RIG_FTX_1::set_rf_gain(int val)
 
 int  RIG_FTX_1::get_rf_gain()
 {
-	int rfval = 0;
-	cmd = "RG0;";
-	cmd[2] = active_side();
+	cmd = rsp = "RG0";
+	cmd[2] = rsp[2] = active_side();
+	cmd += ';';
 	get_trace(1, __func__);
-	wait_char(';',7, FTX_1_WAIT_TIME, __func__, ASC);
+	wait_char(';', 7, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind("RG");
-	if (p == std::string::npos) return progStatus.rfgain;
-	for (int i = 3; i < 6; i++) {
-		rfval *= 10;
-		rfval += replystr[p+i] - '0';
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 6 >= replystr.length()) {
+		return progStatus.rfgain;
 	}
-	return ceil(rfval);
+	int rf_level = atoi(replystr.substr(pos + 3, 3).c_str());
+	return round(rf_level / 2.55);
 }
 
 void RIG_FTX_1::set_squelch(int val)
@@ -1720,14 +1794,15 @@ void RIG_FTX_1::set_compression(int on, int val)
 	sett("");
 	showresp(WARN, ASC, __func__, cmd, replystr);
 
-	// Can only send PR command in SSB mode.  Other modes will cause 891 to
-	// return ?; in response to sending this
+	// PR0 speech processor, 1 off, 2 on.  Only sent in SSB, where the
+	// processor applies.
 	int curMode = rigbase::isOnA() ? modeA : modeB;
 	if ( curMode == mLSB || curMode == mUSB ) {
-		if (on)
+		if (on) {
+			cmd = "PR02;";
+		} else {
 			cmd = "PR01;";
-		else
-			cmd = "PR00;";
+		}
 		set_trace(2, "set Comp", cmd.c_str());
 		set_trace(1, "set_comp_level");
 		sendCommand(cmd);
@@ -1751,8 +1826,7 @@ void RIG_FTX_1::get_compression(int &on, int &val)
 	if (val > 100) val = 100;
 	val = ceil(val);
 
-	// Can only send PR command in SSB mode.  Other modes will cause 891 to
-	// return ?; in response to sending this
+	// PR0 speech processor, 1 off, 2 on.  Only read in SSB.
 	int curMode = rigbase::isOnA() ? modeA : modeB;
 	if ( curMode == mLSB || curMode == mUSB ) {
 		cmd = "PR0;";
@@ -1762,7 +1836,7 @@ void RIG_FTX_1::get_compression(int &on, int &val)
 		size_t p = replystr.rfind("PR0");
 		if (p == std::string::npos) return;
 
-		on = replystr[p+3] - '0';
+		on = (replystr[p+3] == '2');
 	}
 	
 	std::stringstream s;
