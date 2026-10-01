@@ -31,6 +31,7 @@ private:
 /// last good raw reading (0-255) of each RM meter, indexed by RM P1
 	int  m_meter_raw[9];
 
+	size_t last_frame(const char *prefix, size_t length);
 	int  read_meter(int meter, const char *label);
 
 public:

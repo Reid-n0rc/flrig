@@ -411,6 +411,20 @@ return true;
 	return true;
 }
 
+/// Position of the last complete reply in replystr that starts with
+/// prefix and is length characters long, ';' included, or npos.  A
+/// reply left over from an earlier command is never parsed as this
+/// command's reply.
+size_t RIG_FT710::last_frame(const char *prefix, size_t length)
+{
+	size_t pos = replystr.rfind(prefix);
+	if (pos == std::string::npos || pos + length > replystr.length() ||
+		replystr[pos + length - 1] != ';') {
+		return std::string::npos;
+	}
+	return pos;
+}
+
 unsigned long long RIG_FT710::get_vfoA ()
 {
 	cmd = "FA";
@@ -418,13 +432,14 @@ unsigned long long RIG_FT710::get_vfoA ()
 	wait_char(';', 12, 100, "get vfo A", ASC);
 	gett("get_vfoA()");
 
-//replystr = "XXXFA014025500;";
-	if (replystr.find("FA") == std::string::npos)
+	size_t pos = last_frame("FA", 12);
+	if (pos == std::string::npos) {
 		return freqA;
+	}
 
 	unsigned long long f = 0;
 
-	sscanf(replystr.c_str(), "FA%lld", &f);
+	sscanf(&replystr[pos], "FA%lld", &f);
 	if (f)
 		freqA = f;
 	return freqA;
@@ -450,12 +465,13 @@ unsigned long long RIG_FT710::get_vfoB ()
 	wait_char(';', 12, 100, "get vfo B", ASC);
 	gett("get_vfoB()");
 
-//	replystr = "YYYYYFB7300000;";
-	if (replystr.find("FB") == std::string::npos)
+	size_t pos = last_frame("FB", 12);
+	if (pos == std::string::npos) {
 		return freqB;
+	}
 
 	unsigned long long f = 0;
-	sscanf(replystr.c_str(), "FB%lld", &f);
+	sscanf(&replystr[pos], "FB%lld", &f);
 	if (f)
 		freqB = f;
 	return freqB;
@@ -572,9 +588,8 @@ int RIG_FT710::get_smeter()
 
 	gett("get_smeter()");
 
-	size_t pos = replystr.rfind("SM0");
-	if (pos == std::string::npos || pos + 7 > replystr.length() ||
-		replystr[pos + 6] != ';') {
+	size_t pos = last_frame("SM0", 7);
+	if (pos == std::string::npos) {
 		return -1;
 	}
 
@@ -665,9 +680,8 @@ int RIG_FT710::read_meter(int meter, const char *label)
 	wait_char(';', 10, 100, label, ASC);
 	gett(label);
 
-	size_t pos = replystr.rfind(prefix);
-	if (pos == std::string::npos || pos + 10 > replystr.length() ||
-		replystr[pos + 9] != ';') {
+	size_t pos = last_frame(prefix, 10);
+	if (pos == std::string::npos) {
 		return m_meter_raw[meter];
 	}
 	for (size_t digit = pos + 3; digit < pos + 6; digit++) {
@@ -756,12 +770,12 @@ int RIG_FT710::get_volume_control()
 
 	gett("get_volume_control()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return progStatus.volume;
-	if (p + 6 >= replystr.length()) return progStatus.volume;
+	size_t pos = last_frame("AG0", 7);
+	if (pos == std::string::npos) {
+		return progStatus.volume;
+	}
 	int val = 0;
-	if (p != std::string::npos)
-		sscanf(replystr.c_str(), "AG0%d", &val);
+	sscanf(&replystr[pos], "AG0%d", &val);
 	val *= 100;
 	val /= 255;
 	if (val > 100) val = 100;
@@ -827,11 +841,11 @@ int RIG_FT710::get_tune()
 {
 	cmd = rsp = "AC";
 	cmd += ';';
-	wait_char(';', 5, 100, "get tune", ASC);
+	wait_char(';', 6, 100, "get tune", ASC);
 
 	rig_trace(2, "get_tuner status()", replystr.c_str());
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = last_frame("AC", 6);
 	if (p == std::string::npos) return 0;
 	if (replystr[p+4] == '0') return 0;
 	return 1;
@@ -1090,7 +1104,7 @@ int RIG_FT710::get_bwA()
 
 	gett("get_bwA()");
 
-	size_t p = replystr.rfind(rsp);
+	size_t p = last_frame("SH0", 7);
 	if (p == std::string::npos) return bwA;
 
 	replystr[p+6] = 0;
@@ -1142,8 +1156,7 @@ int RIG_FT710::get_bwB()
 
 	gett("get_bwB()");
 
-	size_t p = replystr.rfind(rsp);
-	p = replystr.find(rsp);
+	size_t p = last_frame("SH0", 7);
 	if (p == std::string::npos) return bwB;
 
 	replystr[p+6] = 0;
@@ -1547,7 +1560,11 @@ int RIG_FT710::get_break_in()
 {
 	cmd = "BI;";
 	wait_char(';', 4, 100, "get break in", ASC);
-	progStatus.break_in = (replystr[2] == '1');
+	size_t pos = last_frame("BI", 4);
+	if (pos == std::string::npos) {
+		return progStatus.break_in;
+	}
+	progStatus.break_in = (replystr[pos + 2] == '1');
 	if (progStatus.break_in) {
 		break_in_label("BK-IN");
 		progStatus.cw_delay = 0;
