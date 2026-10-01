@@ -197,6 +197,9 @@ RIG_FT891::RIG_FT891() {
 	preamp_level = 1;
 	notch_on = false;
 	m_60m_indx = 0;
+	for (int i = 0; i < 4; i++) {
+		m_bfo_orig[i] = -1;
+	}
 
 	precision = 1;
 	ndigits = 9;
@@ -259,6 +262,39 @@ void RIG_FT891::initialize()
 
 void RIG_FT891::post_initialize()
 {
+}
+
+/// CAT menu numbers of the BFO menus: SSB 11-07, CW 07-07, RTTY 10-11
+/// and DATA 08-12.  Indexed by bfo_index().
+static const char *FT891_BFO_MENU[] = {
+	"EX1107", "EX0707", "EX1011", "EX0812" };
+
+/// Trace labels for the BFO menus, same order as FT891_BFO_MENU[].
+static const char *FT891_BFO_NAME[] = {
+	"SSB sideband", "CW sideband", "TTY sideband", "DATA sideband" };
+
+/// Restore the BFO menus to the values found before flrig changed them,
+/// so that AUTO is not lost.  Called by closeRig() after
+/// restore_xcvr_vals(); only writes when Restore Mode is set.
+void RIG_FT891::shutdown() {
+	if (progStatus.restore_mode) {
+		guard_lock serial_lock(&mutex_serial, "FT891 shutdown");
+		for (int i = 0; i < 4; i++) {
+			if (m_bfo_orig[i] < 0) {
+				continue;
+			}
+			cmd = FT891_BFO_MENU[i];
+			cmd += (char)('0' + m_bfo_orig[i]);
+			cmd += ';';
+			set_trace(1, "restore BFO menu");
+			sendCommand(cmd);
+			showresp(WARN, ASC, "restore BFO menu", cmd, replystr);
+			sett("");
+		}
+	}
+	for (int i = 0; i < 4; i++) {
+		m_bfo_orig[i] = -1;
+	}
 }
 
 bool RIG_FT891::check ()
@@ -805,81 +841,93 @@ std::vector<std::string>& RIG_FT891::bwtable(int n)
 	return FT891_widths_SSB;
 }
 
-void RIG_FT891::set_sideband(int md)
-{
-	switch (md) {
-		case mLSB: 
+/// Index into FT891_BFO_MENU[] and m_bfo_orig[] for a mode, or -1 if
+/// the mode has no BFO menu (AM, FM).
+int RIG_FT891::bfo_index(int mode) {
+	switch (mode) {
+		case mLSB:
 		case mUSB:
-			cmd = "EX1107";
-			cmd += (md == mLSB ? '1' : '0');
-			cmd += ';';
-			set_trace(1, "set_SSB_sideband()");
-			sendCommand(cmd);
-			showresp(WARN, ASC, "SET SSB sideband", cmd, replystr);
-			break;
-		case mCW: case mCWR:
-			cmd = "EX0707";
-			cmd += (md == mCWR ? '1' : '0');
-			cmd += ';';
-			set_trace(1, "set_CW_sideband()");
-			sendCommand(cmd);
-			showresp(WARN, ASC, "SET CW sideband", cmd, replystr);
-			break;
-		case mTTYL: case mTTYU:
-			cmd = "EX1011";
-			cmd += (md == mTTYL ? '1' : '0');
-			cmd += ';';
-			sendCommand(cmd);
-			set_trace(1, "set_TTY_sideband()");
-			showresp(WARN, ASC, "SET TTY sideband", cmd, replystr);
-			break;
-		case mDATAL: case mDATAU:
-			cmd = "EX0812";
-			cmd += (md == mDATAL ? '1' : '0');
-			cmd += ';';
-			sendCommand(cmd);
-			set_trace(1, "set_DATA_sideband()");
-			showresp(WARN, ASC, "SET DATA sideband", cmd, replystr);
-			break;
+			return 0;
+		case mCW:
+		case mCWR:
+			return 1;
+		case mTTYL:
+		case mTTYU:
+			return 2;
+		case mDATAL:
+		case mDATAU:
+			return 3;
 		default:
 			break;
 	}
-	sett("");
-	return;
+	return -1;
 }
 
-int RIG_FT891::get_sideband(int md)
-{
-	size_t p;
-	int sb = 0;
-	switch (md) {
-		case mLSB: case mUSB:
-			cmd = "EX1107;";
-			get_trace(1, "get_SSB_sideband()");
-			wait_char(';', 8, FL891_WAIT_TIME, "GET SSB sideband", ASC);
-			break;
-		case mCW: case mCWR:
-			cmd = "EX0707;";
-			get_trace(1, "get_CW_sideband()");
-			wait_char(';', 8, FL891_WAIT_TIME, "GET CW sideband", ASC);
-			break;
-		case mTTYL: case mTTYU:
-			cmd = "EX1011;";
-			get_trace(1, "get_TTY_sideband()");
-			wait_char(';', 8, FL891_WAIT_TIME, "GET TTY sideband", ASC);
-			break;
-		case mDATAL: case mDATAU:
-			cmd = "EX0812;";
-			get_trace(1, "get_DATA_sideband()");
-			wait_char(';', 8, FL891_WAIT_TIME, "GET DATA sideband", ASC);
-			break;
-		default: 
-			break;
+/// Returns true if a BFO menu value puts the xcvr on the lower sideband
+/// at frequency.  value 0: USB, 1: LSB, 2: AUTO (SSB and CW only),
+/// -1: read failed, treated as USB.  AUTO is LSB on 7 MHz and below and
+/// USB on 10 MHz and above.
+bool RIG_FT891::bfo_is_lsb(int value, unsigned long long frequency) {
+	if (value == 1) {
+		return true;
 	}
+	if (value == 2) {
+		return (frequency < 10000000ULL);
+	}
+	return false;
+}
+
+/// Write the BFO menu for mode.  The menu is read once before flrig
+/// first writes it, so that shutdown() can restore the original value.
+void RIG_FT891::set_sideband(int mode) {
+	int menu_index = bfo_index(mode);
+	if (menu_index < 0) {
+		return;
+	}
+
+	bool want_lsb = (mode == mLSB || mode == mCWR ||
+		mode == mTTYL || mode == mDATAL);
+
+	if (m_bfo_orig[menu_index] < 0) {
+		get_sideband(mode);
+	}
+
+	cmd = FT891_BFO_MENU[menu_index];
+	cmd += (want_lsb ? '1' : '0');
+	cmd += ';';
+	set_trace(2, "set ", FT891_BFO_NAME[menu_index]);
+	sendCommand(cmd);
+	showresp(WARN, ASC, "SET BFO menu", cmd, replystr);
+	sett("");
+}
+
+/// Read the BFO menu for mode.  Returns 0: USB, 1: LSB, 2: AUTO, or -1
+/// if the read failed.  The first value read from each menu is saved in
+/// m_bfo_orig[] for shutdown().
+int RIG_FT891::get_sideband(int mode) {
+	int menu_index = bfo_index(mode);
+	if (menu_index < 0) {
+		return -1;
+	}
+
+	cmd = FT891_BFO_MENU[menu_index];
+	cmd += ';';
+	get_trace(2, "get ", FT891_BFO_NAME[menu_index]);
+	wait_char(';', 8, FL891_WAIT_TIME, "GET BFO menu", ASC);
 	gett("");
-	p = replystr.rfind("EX");
-	if (p != std::string::npos) sb = replystr[p+6] - '0';
-	return sb;
+
+	int value = -1;
+	size_t found = replystr.rfind(FT891_BFO_MENU[menu_index]);
+	if (found != std::string::npos && found + 6 < replystr.length()) {
+		value = replystr[found + 6] - '0';
+		if (value < 0 || value > 2) {
+			value = -1;
+		}
+	}
+	if (value >= 0 && m_bfo_orig[menu_index] < 0) {
+		m_bfo_orig[menu_index] = value;
+	}
+	return value;
 }
 
 void RIG_FT891::set_modeA(int val)
@@ -922,14 +970,20 @@ int RIG_FT891::get_modeA()
 			int md = 0;
 			switch (replystr[p+3]) {
 				case '1': case '2':
-					md = get_sideband(mLSB);
-					if (md == 0) md = mUSB;
-					else if (md == 1) md = mLSB;
-					else md = (freqA < 10000000 ? mLSB : mUSB);
+					md = (bfo_is_lsb(get_sideband(mLSB), freqA) ? mLSB : mUSB);
 					break;
-				case '3': case '7': md = (get_sideband(mCW) ? mCWR : mCW); break;
-				case '6': case '9': md = (get_sideband(mTTYU) ? mTTYL : mTTYU); break;
-				case '8': case 'C': md = (get_sideband(mDATAU) ? mDATAL : mDATAU); break;
+				case '3': case '7':
+					md = (bfo_is_lsb(get_sideband(mCW), freqA) ?
+						mCWR : mCW);
+					break;
+				case '6': case '9':
+					md = (bfo_is_lsb(get_sideband(mTTYU), freqA) ?
+						mTTYL : mTTYU);
+					break;
+				case '8': case 'C':
+					md = (bfo_is_lsb(get_sideband(mDATAU), freqA) ?
+						mDATAL : mDATAU);
+					break;
 				case '4': md = mFM; break;
 				case '5': md = mAM; break;
 				case 'B': md = mFMN; break;
@@ -986,14 +1040,20 @@ int RIG_FT891::get_modeB()
 			int md = 0;
 			switch (replystr[p+3]) {
 				case '1': case '2':
-					md = get_sideband(mLSB);
-					if (md == 0) md = mUSB;
-					else if (md == 1) md = mLSB;
-					else md = (freqB < 10000000 ? mLSB : mUSB);
+					md = (bfo_is_lsb(get_sideband(mLSB), freqB) ? mLSB : mUSB);
 					break;
-				case '3': case '7': md = (get_sideband(mCW) ? mCWR : mCW); break;
-				case '6': case '9': md = (get_sideband(mTTYU) ? mTTYL : mTTYU); break;
-				case '8': case 'C': md = (get_sideband(mDATAU) ? mDATAL : mDATAU); break;
+				case '3': case '7':
+					md = (bfo_is_lsb(get_sideband(mCW), freqB) ?
+						mCWR : mCW);
+					break;
+				case '6': case '9':
+					md = (bfo_is_lsb(get_sideband(mTTYU), freqB) ?
+						mTTYL : mTTYU);
+					break;
+				case '8': case 'C':
+					md = (bfo_is_lsb(get_sideband(mDATAU), freqB) ?
+						mDATAL : mDATAU);
+					break;
 				case '4': md = mFM; break;
 				case '5': md = mAM; break;
 				case 'B': md = mFMN; break;
