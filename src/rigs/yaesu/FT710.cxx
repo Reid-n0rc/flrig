@@ -583,6 +583,73 @@ int RIG_FT710::get_smeter()
 	return mtr;
 }
 
+/// Convert a raw RM reading with a table of {raw, value} points.
+/// Readings below the first point or above the last one take the end
+/// value, so the lookup never runs off the table.
+static double meter_value(const meterpair *table, size_t points, int raw)
+{
+	if (raw <= table[0].mtr) {
+		return table[0].val;
+	}
+	for (size_t point = 1; point < points; point++) {
+		if (raw <= table[point].mtr) {
+			const meterpair &low = table[point - 1];
+			const meterpair &high = table[point];
+			return low.val + (high.val - low.val) *
+				(raw - low.mtr) / (high.mtr - low.mtr);
+		}
+	}
+	return table[points - 1].val;
+}
+
+/// RM6 to flrig's SWR bar.  SWR points from Hamlib rigs/yaesu/ft710.h
+/// FT710_SWR_CAL (LGPL-2.1-or-later), measured by G3VPX on an FTDX101D:
+/// raw 26 = 1.2, 52 = 1.5, 89 = 2.0, 126 = 3.0, 173 = 4.0, 236 = 5.0.
+/// Each SWR is placed on flrig's bar (1.5 at 10, 2.0 at 23, 3.0 at 48,
+/// 10 at 100), the scale used by rig.get_SWR in xml_server.cxx.
+static const meterpair SWR_TABLE[] = {
+	{   0,   0 },
+	{  26,   4 },
+	{  52,  10 },
+	{  89,  23 },
+	{ 126,  48 },
+	{ 173,  55 },
+	{ 236,  63 },
+	{ 255, 100 }
+};
+
+/// RM5 to watts, measured on one FT-710 (N0RC, 2026-10-01): steady RM5
+/// in RTTY at each PC setting.  The reference is the PC setting, not a
+/// wattmeter.
+static const meterpair POWER_TABLE[] = {
+	{   0,   0 },
+	{  47,   5 },
+	{  65,  10 },
+	{ 100,  25 },
+	{ 140,  50 },
+	{ 169,  75 },
+	{ 185, 100 }
+};
+
+/// RM7 to amps: 0-255 = 0-25.5 A, from Hamlib rigs/yaesu/ft991.h
+/// FT991_ID_CAL (LGPL-2.1-or-later, corrected in Hamlib issue #2073).
+/// Hamlib's FT710_ID_CAL stops at 10 A, below the FT-710's 100 W draw.
+/// An FT-710 read 55 at 5 W and 167 at 100 W, i.e. 5.5 A and 16.7 A.
+static const meterpair IDD_TABLE[] = {
+	{   0,  0.0 },
+	{ 255, 25.5 }
+};
+
+/// RM8 to volts, measured on one FT-710 (N0RC, 2026-10-01): RM8 214
+/// in receive with 13.97 V measured at the radio, as a line through 0.
+/// Hamlib's FT710_VD_CAL (192 = 13.8 V, marked TBC) is from the FT-991
+/// and reads 15.6 V for this radio.
+static const meterpair VDD_TABLE[] = {
+	{   0,  0.00 },
+	{ 214, 13.97 },
+	{ 255, 16.65 }
+};
+
 /// Read meter RM P1 (manual p.19): answer RM P1 P2P2P2 000 ; is 10
 /// characters.  Sent once; the radio answers every RM it receives, and
 /// a second answer is read by the next command.  Returns the raw value
@@ -617,72 +684,31 @@ int RIG_FT710::get_swr()
 {
 	int mtr = read_meter(6, "get swr");
 
-	return mtr / 2.56;
+	return (int)round(meter_value(SWR_TABLE,
+		sizeof(SWR_TABLE) / sizeof(meterpair), mtr));
 }
 
 double RIG_FT710::get_idd()
 {
-	static meterpair iddtbl[] = {
-		{ 52, 5.0 },
-		{ 70, 7.0 },
-		{ 96, 10.0 },
-		{ 116, 12.0 },
-		{ 125, 13.0 },
-		{ 134, 14.0 },
-		{ 143, 15.0 },
-		{ 152, 16.0 },
-		{ 161, 17.0 },
-		{ 171, 18.0 },
-		{ 191, 20.0 }
-	};
-
 	int mtr = read_meter(7, "get idd");
 
-	size_t i = 0;
-	for (i = 0; i < sizeof(iddtbl) / sizeof(meterpair) - 1; i++)
-		if (mtr >= iddtbl[i].mtr && mtr < iddtbl[i+1].mtr)
-			break;
-	if (mtr < 0) mtr = 0;
-	if (mtr > 191) mtr = 191;
-	double idd = iddtbl[i].val +
-		  (iddtbl[i+1].val - iddtbl[i].val)*(mtr - iddtbl[i].mtr) / (iddtbl[i+1].mtr - iddtbl[i].mtr);
-	if (idd > 25) idd = 25;
-
-	return idd;
+	return meter_value(IDD_TABLE, sizeof(IDD_TABLE) / sizeof(meterpair), mtr);
 }
 
 double RIG_FT710::get_voltmeter()
 {
 	int mtr = read_meter(8, "get vdd");
 
-	return 13.8 * mtr / 190;
+	return meter_value(VDD_TABLE, sizeof(VDD_TABLE) / sizeof(meterpair), mtr);
 }
 
 
 int RIG_FT710::get_power_out()
 {
-	static meterpair pwrtbl[] = { 
-		{ 35,  5.0 },
-		{ 94, 25.0 },
-		{147, 50.0 },
-		{176, 75.0 },
-		{205,100.0 }
-	};
-
 	int mtr = read_meter(5, "get pout");
 
-	size_t i = 0;
-	for (i = 0; i < sizeof(pwrtbl) / sizeof(meterpair) - 1; i++)
-		if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i+1].mtr)
-			break;
-	if (mtr < 0) mtr = 0;
-	if (mtr > 205) mtr = 205;
-	double pwr = (int)ceil(pwrtbl[i].val + 
-		  (pwrtbl[i+1].val - pwrtbl[i].val)*(mtr - pwrtbl[i].mtr) / (pwrtbl[i+1].mtr - pwrtbl[i].mtr));
-
-	if (pwr > 100) pwr = 100;
-
-	return pwr;
+	return (int)round(meter_value(POWER_TABLE,
+		sizeof(POWER_TABLE) / sizeof(meterpair), mtr));
 }
 
 int RIG_FT710::get_alc()
