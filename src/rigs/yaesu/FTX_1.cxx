@@ -268,6 +268,7 @@ RIG_FTX_1::RIG_FTX_1() {
 
 // derived specific
 	atten_level = 1;
+	m_head = '0';
 	notch_on = false;
 	m_60m_indx = 0;
 
@@ -559,35 +560,38 @@ int RIG_FTX_1::get_smeter()
 	return mtr;
 }
 
-int RIG_FTX_1::get_swr()
-{
-	cmd = "RM6;";
+/// read RM meter P1 (4 ALC, 5 PO, 6 SWR), 0 - 255
+/// answer is RM P1 P2P2P2 P3P3P3; with P3 fixed 000
+int RIG_FTX_1::get_meter(char meter) {
+	cmd = rsp = "RM0";
+	cmd[2] = rsp[2] = meter;
+	cmd += ';';
 	get_trace(1, __func__);
-	wait_char(';',7, FTX_1_WAIT_TIME, __func__, ASC);
+	wait_char(';', 10, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind("RM");
-	if (p == std::string::npos) return 0;
-	if (p + 6 >= replystr.length()) return 0;
-	int mtr = atoi(&replystr[p+3]);
-	return (int)ceil(mtr / 2.56);
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 6 >= replystr.length()) {
+		return 0;
+	}
+	return atoi(replystr.substr(pos + 3, 3).c_str());
+}
+
+int RIG_FTX_1::get_swr()
+{
+	return (int)ceil(get_meter('6') / 2.56);
 }
 
 int RIG_FTX_1::get_alc()
 {
-	cmd = "RM4;";
-	get_trace(1, __func__);
-	wait_char(';',7, FTX_1_WAIT_TIME, __func__, ASC);
-	gett("");
-
-	size_t p = replystr.rfind("RM");
-	if (p == std::string::npos) return 0;
-	if (p + 6 >= replystr.length()) return 0;
-	int mtr = atoi(&replystr[p+3]);
-	return (int)ceil(mtr / 2.56);
+	return (int)ceil(get_meter('4') / 2.56);
 }
 
-static meterpair pwrtbl[] = {
+// RM5 (PO) to watts.  PROVISIONAL: these are not measured on an FTX-1.
+// The SPA-1 table is the FT-891 100 W curve and the field head table is
+// the same curve scaled to 10 W.  They need to be replaced with readings
+// taken against a wattmeter.
+static meterpair pwrtbl_spa1[] = {
 {0, 0},
 {35, 5.0},
 {59, 10.0},
@@ -611,68 +615,137 @@ static meterpair pwrtbl[] = {
 {208, 100.0}
 };
 
+static meterpair pwrtbl_field[] = {
+{0, 0},
+{35, 0.5},
+{59, 1.0},
+{72, 1.5},
+{86, 2.0},
+{96, 2.5},
+{107, 3.0},
+{119, 3.5},
+{129, 4.0},
+{141, 4.5},
+{150, 5.0},
+{155, 5.5},
+{161, 6.0},
+{166, 6.5},
+{173, 7.0},
+{179, 7.5},
+{184, 8.0},
+{191, 8.5},
+{196, 9.0},
+{202, 9.5},
+{208, 10.0}
+};
+
 int RIG_FTX_1::get_power_out()
 {
-	cmd = "RM5;";
-	get_trace(1, __func__);
-	wait_char(';',7, FTX_1_WAIT_TIME, __func__, ASC);
-	gett("");
+	int mtr = get_meter('5');
 
-	size_t p = replystr.rfind("RM5");
-	if (p == std::string::npos) return 0;
-	if (p + 6 >= replystr.length()) return 0;
-
-	int mtr = atoi(&replystr[p+3]);
-
-//	mtr = (.06 * mtr) + (.002 * mtr * mtr);
+	meterpair *pwrtbl = pwrtbl_spa1;
+	size_t entries = sizeof(pwrtbl_spa1) / sizeof(*pwrtbl_spa1);
+	if (m_head == '1') {
+		pwrtbl = pwrtbl_field;
+		entries = sizeof(pwrtbl_field) / sizeof(*pwrtbl_field);
+	}
 
 	size_t i = 0;
-	for (i = 0; i < sizeof(pwrtbl) / sizeof(*pwrtbl) - 1; i++)
-		if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i+1].mtr)
+	for (i = 0; i < entries - 1; i++) {
+		if (mtr >= pwrtbl[i].mtr && mtr < pwrtbl[i + 1].mtr) {
 			break;
+		}
+	}
+	if (i == entries - 1) {
+		return (int)ceil(pwrtbl[i].val);
+	}
 	int val = (int)ceil(
-				 pwrtbl[i].val + 
-				(pwrtbl[i+1].val - pwrtbl[i].val) * (mtr - pwrtbl[i].mtr) / (pwrtbl[i+1].mtr - pwrtbl[i].mtr));
-	if (val > 100) val = 100;
+		pwrtbl[i].val +
+		(pwrtbl[i + 1].val - pwrtbl[i].val) * (mtr - pwrtbl[i].mtr) /
+		(pwrtbl[i + 1].mtr - pwrtbl[i].mtr));
 
 	return val;
 }
 
-// Transceiver power level
+// PC P1 P2
+//   P1 1: FTX-1 field head, 0.5 - 10 W (6 W on battery), may answer
+//         with tenths, e.g. PC10.5;
+//   P1 2: SPA-1, 5 - 100 W, whole watts PC2005;
 
-static 	char SPA1 = '0';
-
-void RIG_FTX_1::get_pc_min_max_step(double &min, double &max, double &step)
-{
-	if (SPA1 == '1') { // FTX-1 field head
-		min = 5; max = 10; step = 1;
-	} else { // SPA-1
-		min = 5; max = 100; step = 1;
-	}
-}
-
-double RIG_FTX_1::get_power_control()
-{
-	cmd = "PC;";
+/// Find out which head is fitted from the PC answer.  m_head is '1' field
+/// head, '2' SPA-1, '0' not known yet.
+void RIG_FTX_1::read_head() {
+	cmd = rsp = "PC";
+	cmd += ';';
 	get_trace(1, __func__);
 	wait_char(';', 7, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
 
-	size_t p = replystr.rfind("PC");
-	if (p == std::string::npos) return progStatus.power_level;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 2 >= replystr.length()) {
+		return;
+	}
+	if (replystr[pos + 2] == '1' || replystr[pos + 2] == '2') {
+		m_head = replystr[pos + 2];
+	}
+}
 
-	int pc_ctl = 0;
-	sscanf(&replystr[p], "PC%c%d;", &SPA1, &pc_ctl);
+void RIG_FTX_1::get_pc_min_max_step(double &min, double &max, double &step)
+{
+	if (m_head == '0') {
+		read_head();
+	}
+	if (m_head == '1') {
+		min = 0.5; max = 10; step = 0.5;
+	} else {
+		min = 5; max = 100; step = 1;
+	}
+	pmax = max;
+}
 
-	return pc_ctl;
+double RIG_FTX_1::get_power_control()
+{
+	read_head();
+
+	size_t pos = replystr.rfind("PC");
+	if (pos == std::string::npos || pos + 3 >= replystr.length()) {
+		return progStatus.power_level;
+	}
+	return atof(replystr.substr(pos + 3).c_str());
 }
 
 void RIG_FTX_1::set_power_control(double val)
 {
-	char strcmd[8];
-	snprintf(strcmd, sizeof (strcmd), "PC%c%03d;",
-		SPA1, (int)val);
-	cmd = strcmd;
+	if (m_head == '0') {
+		read_head();
+	}
+	char cmdstr[20];
+	if (m_head == '1') {
+		if (val < 0.5) {
+			val = 0.5;
+		}
+		if (val > 10) {
+			val = 10;
+		}
+		int tenths = (int)round(val * 10);
+		if (tenths % 10 == 0) {
+			snprintf(cmdstr, sizeof(cmdstr), "PC1%03d;", tenths / 10);
+		} else {
+			snprintf(cmdstr, sizeof(cmdstr), "PC1%.1f;", tenths / 10.0);
+		}
+	} else if (m_head == '2') {
+		if (val < 5) {
+			val = 5;
+		}
+		if (val > 100) {
+			val = 100;
+		}
+		snprintf(cmdstr, sizeof(cmdstr), "PC2%03d;", (int)round(val));
+	} else {
+		LOG_WARN("FTX-1 head type unknown, power not set");
+		return;
+	}
+	cmd = cmdstr;
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");

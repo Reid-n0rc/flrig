@@ -28,6 +28,11 @@ private:
 	bool notch_on;
 	int  m_60m_indx;
 
+/// PC P1 of the fitted head: '1' field head, '2' SPA-1, '0' not known
+	char m_head;
+	void read_head();
+	int  get_meter(char meter);
+
 /// CAT P1 digit for the side flrig is using: '0' MAIN (A), '1' SUB (B)
 	char active_side();
 	bool fixed_width(int mode);
