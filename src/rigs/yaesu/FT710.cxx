@@ -1522,16 +1522,31 @@ bool RIG_FT710::set_cw_spot()
 
 void RIG_FT710::set_cw_weight()
 {
-	int n = round(progStatus.cw_weight * 10);
-	cmd.assign("EX020205").append(to_decimal(n, 2)).append(";");
+/// CW WEIGHT is EX020203 (manual p.11).  The manual gives P4 as 25-45,
+/// but an FT-710 answers ?; to 25 and takes 00-20 for 2.5-4.5.
+	int n = round((progStatus.cw_weight - 2.5) * 10);
+	if (n < 0) {
+		n = 0;
+	}
+	if (n > 20) {
+		n = 20;
+	}
+	cmd.assign("EX020203").append(to_decimal(n, 2)).append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET cw weight", cmd, replystr);
 }
 
 void RIG_FT710::set_cw_qsk()
 {
+/// QSK DELAY TIME is EX020119 (manual p.11): 0-3 for 15-30 msec
 	int n = progStatus.cw_qsk / 5 - 3;
-	cmd.assign("EX0202116").append(to_decimal(n, 1)).append(";");
+	if (n < 0) {
+		n = 0;
+	}
+	if (n > 3) {
+		n = 3;
+	}
+	cmd.assign("EX020119").append(to_decimal(n, 1)).append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET cw qsk", cmd, replystr);
 }
