@@ -930,13 +930,21 @@ int RIG_FT710::get_preamp()
 
 static bool narrow = 0; // 0 - wide, 1 - narrow
 
+/// AM, FM and DATA-FM have no width setting; AM-N, FM-N and DATA-FM-N
+/// have one fixed width (manual Table 3, p.20)
+bool RIG_FT710::fixed_width(int mode)
+{
+	return mode == mFM || mode == mAM || mode == mFM_N ||
+		mode == mDATA_FM || mode == mAM_N || mode == mDATA_FMN;
+}
+
 int RIG_FT710::adjust_bandwidth(int val)
 {
 	int bw = 0;
 	if (val == mCW_U || val == mCW_L) {
 		bandwidths_ = FT710_widths_CW;
 		bw_vals_ = FT710_wvals_CW;
-	} else if (val == mFM || val == mAM || val == mFM_N || val == mDATA_FM || val == mAM_N) {
+	} else if (fixed_width(val)) {
 		if (val == mFM) bandwidths_ = FT710_widths_FMwide;
 		else if (val ==  mAM) bandwidths_ = FT710_widths_AMwide;
 		else if (val == mAM_N) bandwidths_ = FT710_widths_AMnar;
@@ -947,7 +955,7 @@ int RIG_FT710::adjust_bandwidth(int val)
 	} else if (val == mRTTY_L || val == mRTTY_U) { // RTTY
 		bandwidths_ = FT710_widths_RTTY;
 		bw_vals_ = FT710_wvals_RTTY;
-	} else if (val == mDATA_L || val == mDATA_U) { // PSK
+	} else if (val == mDATA_L || val == mDATA_U || val == mPSK) {
 		bandwidths_ = FT710_widths_DATA;
 		bw_vals_ = FT710_wvals_PSK;
 	} else {
@@ -989,9 +997,11 @@ std::vector<std::string>& RIG_FT710::bwtable(int n)
 			return FT710_widths_AMnar;
 		case mRTTY_L: case mRTTY_U: 
 			return FT710_widths_RTTY;
-		case mDATA_L: case mDATA_U: 
+		case mDATA_L: case mDATA_U: case mPSK:
 			return FT710_widths_DATA;
-		case mFM_N: 
+		case mFM_N:
+			return FT710_widths_FMnar;
+		case mDATA_FMN:
 			return FT710_widths_DATA_FMN;
 		case mDATA_FM: 
 			return FT710_widths_DATA_FM;
@@ -1033,7 +1043,9 @@ int RIG_FT710::get_modeA()
 			for (n = 0; n < NUM_MODES; n++)
 				if (md == FT710_mode_chr[n])
 					break;
-			modeA = n;
+			if (n < NUM_MODES) {
+				modeA = n;
+			}
 		}
 	}
 	adjust_bandwidth(modeA);
@@ -1051,7 +1063,7 @@ void RIG_FT710::set_modeB(int val)
 	cmd += ';';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET mode B", cmd, replystr);
-	adjust_bandwidth(modeA);
+	adjust_bandwidth(modeB);
 }
 
 int RIG_FT710::get_modeB()
@@ -1073,7 +1085,9 @@ int RIG_FT710::get_modeB()
 			for (n = 0; n < NUM_MODES; n++)
 				if (md == FT710_mode_chr[n])
 					break;
-			modeB = n;
+			if (n < NUM_MODES) {
+				modeB = n;
+			}
 		}
 	}
 	adjust_bandwidth(modeB);
@@ -1085,7 +1099,7 @@ void RIG_FT710::set_bwA(int val)
 	int bw_indx = bw_vals_[val];
 	bwA = val;
 
-	if (modeA == mFM || modeA == mAM || modeA == mFM_N || modeA == mDATA_FM ) {
+	if (fixed_width(modeA)) {
 		return;
 	}
 	cmd.clear();
@@ -1101,7 +1115,7 @@ void RIG_FT710::set_bwA(int val)
 
 int RIG_FT710::get_bwA()
 {
-	if (modeA == mFM || modeA == mAM || modeA == mFM_N || modeA == mDATA_FM) {
+	if (fixed_width(modeA)) {
 		bwA = 0;
 		mode_bwA[modeA] = bwA;
 		return bwA;	
@@ -1136,7 +1150,7 @@ void RIG_FT710::set_bwB(int val)
 	int bw_indx = bw_vals_[val];
 	bwB = val;
 
-	if (modeB == mFM || modeB == mAM || modeB == mFM_N || modeB == mDATA_FM) {
+	if (fixed_width(modeB)) {
 		mode_bwB[modeB] = 0;
 		return;
 	}
@@ -1153,7 +1167,7 @@ void RIG_FT710::set_bwB(int val)
 
 int RIG_FT710::get_bwB()
 {
-	if (modeB == mFM || modeB == mAM || modeB == mFM_N || modeB == mDATA_FM) {
+	if (fixed_width(modeB)) {
 		bwB = 0;
 		mode_bwB[modeB] = bwB;
 		return bwB;
