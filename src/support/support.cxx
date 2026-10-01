@@ -3575,8 +3575,8 @@ void set_power_controlImage(double pwr)
 		}
 	}
 	else if ((progStatus.pwr_scale == 9 && pwr <= 100.0) || (progStatus.pwr_scale == 6)) {
-		if (img != 6) {
-			img = 6;
+		if (img != 7) {
+			img = 7;
 			scalePower->image(image_p100);
 			sldrFwdPwr->maximum(100.0);
 			sldrFwdPwr->minimum(0.0);
