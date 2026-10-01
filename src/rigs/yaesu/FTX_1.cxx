@@ -113,6 +113,35 @@ static std::vector<std::string>FTX_1_widths_FM;
 static const char *vFTX_1_widths_FM[]  = { "16000" };
 static const int FTX_1_wvals_FM[] = { 0, WVALS_LIMIT };
 
+// SD (CW break-in delay) and VD (VOX delay) codes 00 - 33, in msec
+static const int FTX_1_DELAY_MSEC[] = {
+	  30,   50,  100,  150,  200,  250,  300,  400,  500,  600,
+	 700,  800,  900, 1000, 1100, 1200, 1300, 1400, 1500, 1600,
+	1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600,
+	2700, 2800, 2900, 3000 };
+static const int FTX_1_DELAY_CODES =
+	sizeof(FTX_1_DELAY_MSEC) / sizeof(*FTX_1_DELAY_MSEC);
+
+/// SD / VD code closest to msec
+static int delay_code(int msec) {
+	int best = 0;
+	for (int code = 1; code < FTX_1_DELAY_CODES; code++) {
+		if (abs(FTX_1_DELAY_MSEC[code] - msec) <
+			abs(FTX_1_DELAY_MSEC[best] - msec)) {
+			best = code;
+		}
+	}
+	return best;
+}
+
+/// msec for an SD / VD code, or -1 if the code is out of range
+static int delay_msec(int code) {
+	if (code < 0 || code >= FTX_1_DELAY_CODES) {
+		return -1;
+	}
+	return FTX_1_DELAY_MSEC[code];
+}
+
 //----------------------------------------------------------------------
 static std::vector<std::string>FTX_1_att_labels;
 static const char *vFTX_1_att_labels[] = { "ATT", "12 dB" };
@@ -1547,20 +1576,28 @@ bool RIG_FTX_1::set_cw_spot()
 		return false;
 }
 
+// EX020203 CW WEIGHT 25 - 45 (2.5 - 4.5)
 void RIG_FTX_1::set_cw_weight()
 {
-	int n = round(progStatus.cw_weight * 10);
-	cmd.assign("EX0403").append(to_decimal(n, 2)).append(";");
+	int weight = round(progStatus.cw_weight * 10);
+	cmd.assign("EX020203").append(to_decimal(weight, 2)).append(";");
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
 	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
+// EX020117 QSK DELAY TIME 0: 15, 1: 20, 2: 25, 3: 30 msec
 void RIG_FTX_1::set_cw_qsk()
 {
-	int n = progStatus.cw_qsk / 5 - 3;
-	cmd.assign("EX0713").append(to_decimal(n, 1)).append(";");
+	int qsk_code = progStatus.cw_qsk / 5 - 3;
+	if (qsk_code < 0) {
+		qsk_code = 0;
+	}
+	if (qsk_code > 3) {
+		qsk_code = 3;
+	}
+	cmd.assign("EX020117").append(to_decimal(qsk_code, 1)).append(";");
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
@@ -1569,22 +1606,28 @@ void RIG_FTX_1::set_cw_qsk()
 
 int  RIG_FTX_1::get_cw_qsk()
 {
-	cmd = "EX0713;";
+	cmd = rsp = "EX020117";
+	cmd += ';';
 	get_trace(1, __func__);
-	wait_char(';', 8, FTX_1_WAIT_TIME, __func__, ASC);
+	wait_char(';', 10, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
-	char delay = 0;
-	sscanf(replystr.c_str(), "EX0713%c;", &delay);
-	progStatus.cw_qsk = (delay + 3) * 5;
+
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 8 >= replystr.length()) {
+		return progStatus.cw_qsk;
+	}
+	int qsk_code = replystr[pos + 8] - '0';
+	if (qsk_code >= 0 && qsk_code <= 3) {
+		progStatus.cw_qsk = (qsk_code + 3) * 5;
+	}
 	return progStatus.cw_qsk;
 }
 
+// SD CW break-in delay, 2 digit code
 void RIG_FTX_1::set_cw_delay()
 {
-	int n = progStatus.cw_delay;
-	char szcmd[20] = "EX07090000;";
-	snprintf(szcmd, sizeof(szcmd), "EX0709%04d;", n);
-	cmd = szcmd;
+	cmd.assign("SD").append(to_decimal(delay_code(progStatus.cw_delay), 2));
+	cmd.append(";");
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
@@ -1593,11 +1636,20 @@ void RIG_FTX_1::set_cw_delay()
 
 int  RIG_FTX_1::get_cw_delay()
 {
-	cmd = "EX0709;";
+	cmd = rsp = "SD";
+	cmd += ';';
 	get_trace(1, __func__);
-	wait_char(';', 10, FTX_1_WAIT_TIME, __func__, ASC);
+	wait_char(';', 5, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
-	sscanf(replystr.c_str(), "EX0709%lf;", &progStatus.cw_delay);
+
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 4 >= replystr.length()) {
+		return progStatus.cw_delay;
+	}
+	int msec = delay_msec(atoi(replystr.substr(pos + 2, 2).c_str()));
+	if (msec > 0) {
+		progStatus.cw_delay = msec;
+	}
 	return progStatus.cw_delay;
 }
 
@@ -1739,28 +1791,31 @@ void RIG_FTX_1::get_band_selection(int v)
 	get_trace(2, "get band", cmd.c_str());
 }
 
+// EX030113 REF FREQ ADJ -25 - +25, always signed: +05, -12
 void RIG_FTX_1::setVfoAdj(double v)
 {
 	char cmdstr[20];
-	set_trace(1, __func__);
-	snprintf(cmdstr, sizeof(cmdstr), "EX0517%-2d;", (int)v);
-	sett("");
+	snprintf(cmdstr, sizeof(cmdstr), "EX030113%+03d;", (int)v);
 	cmd = cmdstr;
+	set_trace(1, __func__);
 	sendCommand(cmd);
-	set_trace(3, __func__, cmd.c_str(), replystr.c_str());
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 double RIG_FTX_1::getVfoAdj()
 {
-// response: EX0517+25;
-	cmd = rsp = "EX0517";
+	cmd = rsp = "EX030113";
+	cmd += ';';
 	get_trace(1, __func__);
-	sendCommand(cmd.append(";"));
-	wait_char(';', 10, FTX_1_WAIT_TIME, __func__, ASC);
+	wait_char(';', 12, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return 0;
-	return (double)(atoi(&replystr[p+6]));
+
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 11 >= replystr.length()) {
+		return progStatus.vfo_adj;
+	}
+	return (double)(atoi(&replystr[pos + 8]));
 }
 
 void RIG_FTX_1::get_vfoadj_min_max_step(double &min, double &max, double &step)
