@@ -299,15 +299,19 @@ bool RIG_FTX_1::check ()
 	return false;
 }
 
+/// The FTX-1 has two receivers.  flrig VFO A is the MAIN side and VFO B is
+/// the SUB side.  VS selects which side is in use; FA/FB, MD0/MD1 and
+/// SH0/SH1 always address MAIN and SUB directly.
+char RIG_FTX_1::active_side() {
+	if (inuse == onB) {
+		return '1';
+	}
+	return '0';
+}
+
 unsigned long long RIG_FTX_1::get_vfoA ()
 {
-	// When VFOA is 'selected', radio has it actively loaded in FA, otherwise
-	// it is in FB
-	if (rigbase::isOnA()) {
-		cmd = rsp = "FA";
-	} else 	{
-		cmd = rsp = "FB";
-	}
+	cmd = rsp = "FA";
 	cmd += ';';
 
 	get_trace(1, __func__);
@@ -327,15 +331,7 @@ unsigned long long RIG_FTX_1::get_vfoA ()
 void RIG_FTX_1::set_vfoA (unsigned long long freq)
 {
 	freqA = freq;
-	
-	// When VFOA is 'selected', radio has it actively loaded in FA, otherwise
-	// it is in FB
-	if (rigbase::isOnA()) {
-		cmd = "FA000000000;";
-	} else 	{
-		cmd = "FB000000000;";
-	}
-	
+	cmd = "FA000000000;";
 	for (int i = 0; i < ndigits; i++) {
 		cmd[ndigits + 1 - i] += freq % 10;
 		freq /= 10;
@@ -349,13 +345,7 @@ void RIG_FTX_1::set_vfoA (unsigned long long freq)
 
 unsigned long long RIG_FTX_1::get_vfoB ()
 {
-	// When VFOB is 'selected', radio has it actively loaded in FA, otherwise
-	// it is in FB
-	if (rigbase::isOnB()) {
-		cmd = rsp = "FA";
-	} else {
-		cmd = rsp = "FB";
-	}
+	cmd = rsp = "FB";
 	cmd += ';';
 	get_trace(1, __func__);
 	wait_char(';',12, FTX_1_WAIT_TIME, __func__, ASC);
@@ -375,15 +365,7 @@ unsigned long long RIG_FTX_1::get_vfoB ()
 void RIG_FTX_1::set_vfoB (unsigned long long freq)
 {
 	freqB = freq;
-	
-	// When VFOB is 'selected', radio has it actively loaded in FA, otherwise
-	// it is in FB
-	if (rigbase::isOnB()) {
-		cmd = "FA000000000;";
-	} else {
-		cmd = "FB000000000;";
-	}
-	
+	cmd = "FB000000000;";
 	for (int i = 0; i < ndigits; i++) {
 		cmd[ndigits + 1 - i] += freq % 10;
 		freq /= 10;
@@ -395,34 +377,46 @@ void RIG_FTX_1::set_vfoB (unsigned long long freq)
 	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
-void RIG_FTX_1::selectA()
-{
-	if (inuse == onA) return;
+/// Read which side the radio is using, so a MAIN/SUB change made on the
+/// front panel is followed by flrig.
+int RIG_FTX_1::get_vfoAorB() {
+	cmd = rsp = "VS";
+	cmd += ';';
+	get_trace(1, __func__);
+	wait_char(';', 4, FTX_1_WAIT_TIME, __func__, ASC);
+	gett("");
 
-	cmd = "SV;";
-
-	set_trace(1, "select_A");
-	sendCommand(cmd);
-	sett("");
-	showresp(WARN, ASC, "select A", cmd, replystr);
-
-	set_bwA(bwA);
-
-	inuse = onA;
+	size_t pos = replystr.rfind(rsp);
+	if (pos != std::string::npos && pos + 2 < replystr.length()) {
+		if (replystr[pos + 2] == '1') {
+			inuse = onB;
+		} else {
+			inuse = onA;
+		}
+	}
+	return inuse;
 }
 
-void RIG_FTX_1::selectB()
+void RIG_FTX_1::selectA()
 {
-	if (inuse == onB) return;
-
-	cmd = "SV;";
+	cmd = "VS0;";
 
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
 	showresp(WARN, ASC, __func__, cmd, replystr);
 
-	set_bwB(bwB);
+	inuse = onA;
+}
+
+void RIG_FTX_1::selectB()
+{
+	cmd = "VS1;";
+
+	set_trace(1, __func__);
+	sendCommand(cmd);
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
 
 	inuse = onB;
 }
@@ -452,18 +446,10 @@ void RIG_FTX_1::swapAB()
 {
 	cmd = "SV;";
 
-	int temp = bwB;
-	bwB = bwA;  bwA = temp;
-	temp = modeB;
-	modeB = modeA; modeA = temp;
-
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
 	showresp(WARN, ASC, __func__, cmd, replystr);
-
-	set_bwA(bwA);
-
 }
 
 bool RIG_FTX_1::can_split()
@@ -471,35 +457,46 @@ bool RIG_FTX_1::can_split()
 	return true;
 }
 
+/// Split is done by moving the transmitter to the other side with FT.
+/// ST1 is not used: on the FTX-1 it locks the SUB side in transmit.
 void RIG_FTX_1::set_split(bool val)
 {
 	split = val;
-	if (val) {
-		cmd = "ST1;";
-		sendCommand(cmd);
-		sett("Split ON");
-	} else {
-		cmd = "ST0;";
-		sendCommand(cmd);
-		sett("Split OFF");
+	bool tx_on_sub = (inuse == onA);
+	if (!val) {
+		tx_on_sub = !tx_on_sub;
 	}
+	if (tx_on_sub) {
+		cmd = "FT1;";
+	} else {
+		cmd = "FT0;";
+	}
+	set_trace(1, __func__);
+	sendCommand(cmd);
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int RIG_FTX_1::get_split()
 {
-	cmd = "ST;";
-	wait_char(';', 4, 100, "Get split", ASC);
-	gett("get split()");
-	size_t p = replystr.rfind("ST");
-	if (p == std::string::npos) return 0;
-	int split = replystr[p+2] - '0';
+	cmd = rsp = "FT";
+	cmd += ';';
+	get_trace(1, __func__);
+	wait_char(';', 4, FTX_1_WAIT_TIME, __func__, ASC);
+	gett("");
 
-	return (split > 0);
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos || pos + 2 >= replystr.length()) {
+		return split;
+	}
+	split = (replystr[pos + 2] != active_side());
+	return split;
 }
 
 int RIG_FTX_1::get_smeter()
 {
 	cmd = "SM0;";
+	cmd[2] = active_side();
 	get_trace(1, __func__);
 	wait_char(';',7, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
@@ -636,6 +633,7 @@ void RIG_FTX_1::set_power_control(double val)
 int RIG_FTX_1::get_volume_control()
 {
 	cmd = "AG0;";
+	cmd[2] = active_side();
 	get_trace(1, __func__);
 	wait_char(';',7, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
@@ -652,6 +650,7 @@ void RIG_FTX_1::set_volume_control(int val)
 {
 	int ivol = (int)(val * 2.55);
 	cmd = "AG0000;";
+	cmd[2] = active_side();
 	for (int i = 5; i > 2; i--) {
 		cmd[i] += ivol % 10;
 		ivol /= 10;
@@ -838,11 +837,6 @@ void RIG_FTX_1::set_modeA(int val)
 {
 	modeA = val;
 
-	if (inuse == onB) {
-		LOG_WARN("set_modeA, but on B.  Call selectA() first.");
-		return;
-	}
-
 	adjust_bandwidth(modeA);
 
 	cmd = "MD0";
@@ -974,9 +968,6 @@ void RIG_FTX_1::set_bwA(int val)
 int RIG_FTX_1::get_bwA()
 {
 	size_t p;
-	if (inuse == onB) {
-		return bwA;
-	}
 
 	if (modeA == mFM || modeA == mAM || modeA == mFMN || modeA == mAMN) {
 		bwA = 0;
@@ -1037,10 +1028,6 @@ void RIG_FTX_1::set_bwB(int val)
 int RIG_FTX_1::get_bwB()
 {
 	size_t p;
-	if (inuse == onA) {
-		//LOG_WARN("get_bwB, but on A.  Call selectB() first.");
-		return bwB;
-	}
 
 	if (modeB == mFM || modeB == mAM || modeB == mFMN || modeB == mAMN) {
 		bwB = 0;
@@ -1115,11 +1102,13 @@ void RIG_FTX_1::set_notch(bool on, int val)
 // set notch frequency
 	if (on) {
 		cmd = "BP00001;";
+		cmd[2] = active_side();
 		set_trace(1, __func__);
 		sendCommand(cmd);
 		sett("");
 		showresp(WARN, ASC, __func__, cmd, replystr);
 		cmd = "BP01000;";
+		cmd[2] = active_side();
 		if (val % 10 >= 5) val += 10;
 		val /= 10;
 		for (int i = 3; i > 0; i--) {
@@ -1135,6 +1124,7 @@ void RIG_FTX_1::set_notch(bool on, int val)
 
 // set notch off
 	cmd = "BP00000;";
+	cmd[2] = active_side();
 	set_trace(1, "set_notch OFF");
 	sendCommand(cmd);
 	sett("");
@@ -1145,6 +1135,7 @@ bool  RIG_FTX_1::get_notch(int &val)
 {
 	bool ison = false;
 	cmd = "BP00;";
+	cmd[2] = active_side();
 	get_trace(1, __func__);
 	wait_char(';',8, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
@@ -1156,6 +1147,7 @@ bool  RIG_FTX_1::get_notch(int &val)
 		ison = true;
 		val = progStatus.notch_val;
 		cmd = "BP01";
+		cmd[2] = active_side();
 		get_trace(1, "get notch value()");
 		wait_char(';',8, FTX_1_WAIT_TIME, "get notch val", ASC);
 		gett("");
@@ -1170,7 +1162,8 @@ bool  RIG_FTX_1::get_notch(int &val)
 
 void RIG_FTX_1::set_auto_notch(int v)
 {
-	cmd.assign("BC0").append(v ? "1" : "0" ).append(";");
+	cmd.assign("BC").append(1, active_side());
+	cmd.append(v ? "1" : "0").append(";");
 	set_trace(1, __func__);
 	sendCommand(cmd);
 	sett("");
@@ -1180,10 +1173,11 @@ void RIG_FTX_1::set_auto_notch(int v)
 int  RIG_FTX_1::get_auto_notch()
 {
 	cmd = "BC0;";
+	cmd[2] = active_side();
 	get_trace(1, __func__);
 	wait_char(';',5, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
-	size_t p = replystr.rfind("BC0");
+	size_t p = replystr.rfind("BC");
 	if (p == std::string::npos) return 0;
 	if (replystr[p+3] == '1') return 1;
 	return 0;
@@ -1316,6 +1310,7 @@ int RIG_FTX_1::get_mic_gain()
 void RIG_FTX_1::set_rf_gain(int val)
 {
 	cmd = "RG0000;";
+	cmd[2] = active_side();
 	for (int i = 5; i > 2; i--) {
 		cmd[i] = val % 10 + '0';
 		val /= 10;
@@ -1331,6 +1326,7 @@ int  RIG_FTX_1::get_rf_gain()
 {
 	int rfval = 0;
 	cmd = "RG0;";
+	cmd[2] = active_side();
 	get_trace(1, __func__);
 	wait_char(';',7, FTX_1_WAIT_TIME, __func__, ASC);
 	gett("");
@@ -1759,6 +1755,7 @@ void RIG_FTX_1::get_vfoadj_min_max_step(double &min, double &max, double &step)
 int  RIG_FTX_1::get_agc()
 {
 	cmd = "GT0;";
+	cmd[2] = active_side();
 	wait_char(';', 6, FTX_1_WAIT_TIME, __func__, ASC);
 	gett(__func__);
 
@@ -1783,6 +1780,7 @@ static const char ch[] = {'0', '1', '2', '3', '4'};
 	agcval++;
 	if (agcval > 4) agcval = 0;
 	cmd = "GT00;";
+	cmd[2] = active_side();
 	cmd[3] = ch[agcval];
 
 	sendCommand(cmd);

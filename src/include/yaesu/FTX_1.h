@@ -27,6 +27,9 @@ class RIG_FTX_1 : public rigbase {
 private:
 	bool notch_on;
 	int  m_60m_indx;
+
+/// CAT P1 digit for the side flrig is using: '0' MAIN (A), '1' SUB (B)
+	char active_side();
 protected:
 	int  preamp_level;
 	int  atten_level;
@@ -48,6 +51,7 @@ public:
 	bool twovfos() { return true; }
 	bool canswap() { return true; }
 
+	int  get_vfoAorB();
 	void selectA();
 	void selectB();
 
