@@ -131,6 +131,9 @@ public:
 	const char *name(pthread_mutex_t *m);
 private:
 	pthread_mutex_t* mutex;
+/// false when the constructor found the mutex already held by this
+/// thread; the destructor then leaves it locked for the outer guard
+	bool m_locked;
 	std::string how;
 	long int start_time;
 	long int time_out;
