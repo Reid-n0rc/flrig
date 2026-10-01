@@ -97,18 +97,21 @@ static int FTX_1_wvals_CW[] = {
 16, 17, 18, 19, 20, 
 21, WVALS_LIMIT};
 
-// Single bandwidth modes
-static std::vector<std::string>FTX_1_widths_AMnar;
-static const char *vFTX_1_widths_AMnar[]  = { "6000" };
-static const int FTX_1_wvals_AMnar[] = { 0, WVALS_LIMIT };
+// Single bandwidth modes, CAT manual Table 5
+// AM, AM-N
+static std::vector<std::string>FTX_1_widths_AM;
+static const char *vFTX_1_widths_AM[]  = { "6000" };
+static const int FTX_1_wvals_AM[] = { 0, WVALS_LIMIT };
 
-static std::vector<std::string>FTX_1_widths_AMFM;
-static const char *vFTX_1_widths_AMFM[]  = { "9000" };
-static const int FTX_1_wvals_AMFM[] = { 0, WVALS_LIMIT };
+// FM-N, DATA-FM-N
+static std::vector<std::string>FTX_1_widths_FMN;
+static const char *vFTX_1_widths_FMN[]  = { "9000" };
+static const int FTX_1_wvals_FMN[] = { 0, WVALS_LIMIT };
 
-static std::vector<std::string>FTX_1_widths_DATAFM;
-static const char *vFTX_1_widths_DATAFM[]  = { "16000" };
-static const int FTX_1_wvals_DATAFM[] = { 0, WVALS_LIMIT };
+// FM, DATA-FM, C4FM
+static std::vector<std::string>FTX_1_widths_FM;
+static const char *vFTX_1_widths_FM[]  = { "16000" };
+static const int FTX_1_wvals_FM[] = { 0, WVALS_LIMIT };
 
 //----------------------------------------------------------------------
 static std::vector<std::string>FTX_1_att_labels;
@@ -236,9 +239,9 @@ void RIG_FTX_1::initialize()
 	VECTOR (FTX_1_widths_SSB, vFTX_1_widths_SSB);
 	VECTOR (FTX_1_widths_DATA, vFTX_1_widths_DATA);
 	VECTOR (FTX_1_widths_CW, vFTX_1_widths_CW);
-	VECTOR (FTX_1_widths_AMnar, vFTX_1_widths_AMnar);
-	VECTOR (FTX_1_widths_AMFM, vFTX_1_widths_AMFM);
-	VECTOR (FTX_1_widths_DATAFM, vFTX_1_widths_DATAFM);
+	VECTOR (FTX_1_widths_AM, vFTX_1_widths_AM);
+	VECTOR (FTX_1_widths_FMN, vFTX_1_widths_FMN);
+	VECTOR (FTX_1_widths_FM, vFTX_1_widths_FM);
 
 	VECTOR (FTX_1_att_labels, vFTX_1_att_labels);
 	att_labels_ = FTX_1_att_labels;
@@ -766,43 +769,54 @@ int RIG_FTX_1::get_preamp()
 	return preamp_level;
 }
 
+/// true for modes where the FTX-1 has one fixed bandwidth and SH does
+/// not apply
+bool RIG_FTX_1::fixed_width(int mode) {
+	switch (mode) {
+		case mAM:
+		case mAMN:
+		case mFM:
+		case mFMN:
+		case mDATAFM:
+		case mDATAFMN:
+		case mC4FMDN:
+		case mC4FMVW:
+			return true;
+		default:
+			return false;
+	}
+}
+
 int RIG_FTX_1::adjust_bandwidth(int val)
 {
+	bandwidths_ = bwtable(val);
 	switch (val) {
-		case mCW_U     :
-		case mCW_L   :
-		case mRTTYL :
-		case mRTTYU :
-			bandwidths_ = FTX_1_widths_CW;
+		case mCW_U:
+		case mCW_L:
+		case mRTTYL:
+		case mRTTYU:
 			bw_vals_ = FTX_1_wvals_CW;
 			break;
-		case mFM     :
-			bandwidths_ = FTX_1_widths_DATAFM;
-			bw_vals_ = FTX_1_wvals_DATAFM;
-			break;
-		case mAM     :
-			bandwidths_ = FTX_1_widths_AMFM;
-			bw_vals_    = FTX_1_wvals_AMFM;
-			break;
-		case mAMN   :
-			bandwidths_ = FTX_1_widths_AMnar;
-			bw_vals_    = FTX_1_wvals_AMnar;
-			break;
-		case mDATAL :
-		case mDATAU :
-			bandwidths_ = FTX_1_widths_DATA;
+		case mDATAL:
+		case mDATAU:
+		case mPSK:
 			bw_vals_ = FTX_1_wvals_DATA;
 			break;
-		case mDATAFM :
-			bandwidths_ = FTX_1_widths_DATAFM;
-			bw_vals_ = FTX_1_wvals_DATAFM;
+		case mAM:
+		case mAMN:
+			bw_vals_ = FTX_1_wvals_AM;
 			break;
-		case mDATAFMN :
-			bandwidths_ = FTX_1_widths_AMFM;
-			bw_vals_ = FTX_1_wvals_AMFM;
+		case mFMN:
+		case mDATAFMN:
+			bw_vals_ = FTX_1_wvals_FMN;
+			break;
+		case mFM:
+		case mDATAFM:
+		case mC4FMDN:
+		case mC4FMVW:
+			bw_vals_ = FTX_1_wvals_FM;
 			break;
 		default:
-			bandwidths_ = FTX_1_widths_SSB;
 			bw_vals_ = FTX_1_wvals_SSB;
 	}
 	return FTX_1_def_bw[val];
@@ -816,21 +830,51 @@ int RIG_FTX_1::def_bandwidth(int val)
 std::vector<std::string>& RIG_FTX_1::bwtable(int n)
 {
 	switch (n) {
-		case mFM     : return FTX_1_widths_DATAFM;
-		case mAM     : return FTX_1_widths_AMFM;
-		case mAMN    : return FTX_1_widths_AMnar;
-		case mFMN    : return FTX_1_widths_AMFM;
-		case mCW_U   : return FTX_1_widths_CW;
-		case mCW_L   : return FTX_1_widths_CW;
-		case mRTTYL  : return FTX_1_widths_CW;
-		case mRTTYU  : return FTX_1_widths_CW;
-		case mDATAL  : return FTX_1_widths_DATA;
-		case mDATAU  : return FTX_1_widths_DATA;
-		case mDATAFM : return FTX_1_widths_DATAFM;
-		case mDATAFMN: return FTX_1_widths_AMFM;
-		default      : break;
+		case mCW_U:
+		case mCW_L:
+		case mRTTYL:
+		case mRTTYU:
+			return FTX_1_widths_CW;
+		case mDATAL:
+		case mDATAU:
+		case mPSK:
+			return FTX_1_widths_DATA;
+		case mAM:
+		case mAMN:
+			return FTX_1_widths_AM;
+		case mFMN:
+		case mDATAFMN:
+			return FTX_1_widths_FMN;
+		case mFM:
+		case mDATAFM:
+		case mC4FMDN:
+		case mC4FMVW:
+			return FTX_1_widths_FM;
+		default:
+			return FTX_1_widths_SSB;
 	}
-	return FTX_1_widths_SSB;
+}
+
+/// Set the width for one side.  NARROW is turned off first because with
+/// NARROW on the FTX-1 uses the menu NAR WIDTH and the SH setting does not
+/// hold.
+void RIG_FTX_1::set_width(char side, int bw_index) {
+	cmd = "NA00;";
+	cmd[2] = side;
+	set_trace(1, __func__);
+	sendCommand(cmd);
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
+
+	cmd = "SH00";
+	cmd[2] = side;
+	cmd += '0' + bw_index / 10;
+	cmd += '0' + bw_index % 10;
+	cmd += ';';
+	set_trace(1, __func__);
+	sendCommand(cmd);
+	sett("");
+	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 void RIG_FTX_1::set_modeA(int val)
@@ -948,28 +992,17 @@ int RIG_FTX_1::get_modeB()
 void RIG_FTX_1::set_bwA(int val)
 {
 	bwA = val;
-
-	int bw_indx = bw_vals_[val];
-
-	if (modeA == mFM || modeA == mAM || modeA == mFMN || modeA == mAMN) return;
-
-	set_trace(1, __func__);
-
-	cmd = "SH00";
-	cmd += '0' + bw_indx / 10;
-	cmd += '0' + bw_indx % 10;
-	cmd += ';';
-
-	sendCommand(cmd);
-	sett("");
-	showresp(WARN, ASC, __func__, cmd, replystr);
+	if (fixed_width(modeA)) {
+		return;
+	}
+	set_width('0', bw_vals_[val]);
 }
 
 int RIG_FTX_1::get_bwA()
 {
 	size_t p;
 
-	if (modeA == mFM || modeA == mAM || modeA == mFMN || modeA == mAMN) {
+	if (fixed_width(modeA)) {
 		bwA = 0;
 		return bwA;
 	}
@@ -1008,28 +1041,17 @@ int RIG_FTX_1::get_bwA()
 void RIG_FTX_1::set_bwB(int val)
 {
 	bwB = val;
-
-	int bw_indx = bw_vals_[val];
-
-	if (modeB == mFM || modeB == mAM || modeB == mFMN || modeB == mAMN) return;
-
-	set_trace(1, __func__);
-
-	cmd = "SH10";
-	cmd += '0' + bw_indx / 10;
-	cmd += '0' + bw_indx % 10;
-	cmd += ';';
-
-	sendCommand(cmd);
-	sett("");
-	showresp(WARN, ASC, __func__, cmd, replystr);
+	if (fixed_width(modeB)) {
+		return;
+	}
+	set_width('1', bw_vals_[val]);
 }
 
 int RIG_FTX_1::get_bwB()
 {
 	size_t p;
 
-	if (modeB == mFM || modeB == mAM || modeB == mFMN || modeB == mAMN) {
+	if (fixed_width(modeB)) {
 		bwB = 0;
 		return bwB;
 	}

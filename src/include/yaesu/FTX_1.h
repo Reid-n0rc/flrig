@@ -30,6 +30,8 @@ private:
 
 /// CAT P1 digit for the side flrig is using: '0' MAIN (A), '1' SUB (B)
 	char active_side();
+	bool fixed_width(int mode);
+	void set_width(char side, int bw_index);
 protected:
 	int  preamp_level;
 	int  atten_level;
