@@ -142,6 +142,17 @@ static int delay_msec(int code) {
 	return FTX_1_DELAY_MSEC[code];
 }
 
+/// NB / NR level clamped to 1 - 10
+static int dsp_level(int level) {
+	if (level < 1) {
+		return 1;
+	}
+	if (level > 10) {
+		return 10;
+	}
+	return level;
+}
+
 //----------------------------------------------------------------------
 static std::vector<std::string>FTX_1_att_labels;
 static const char *vFTX_1_att_labels[] = { "ATT", "12 dB" };
@@ -298,6 +309,10 @@ void RIG_FTX_1::initialize()
 	if (progStatus.notch_val < 10) progStatus.notch_val = 1500;
 	if (progStatus.noise_reduction_val < 1) progStatus.noise_reduction_val = 1;
 	if (progStatus.power_level < 5) progStatus.power_level = 5;
+	m_nb_on = progStatus.noise;
+	m_nb_level = dsp_level(progStatus.nb_level);
+	m_nr_on = (progStatus.noise_reduction != 0);
+	m_nr_level = dsp_level(progStatus.noise_reduction_val);
 // first-time-thru, or reset
 	if (progStatus.cw_qsk < 15) {
 		progStatus.cw_qsk = 15;
@@ -1232,100 +1247,102 @@ int  RIG_FTX_1::get_auto_notch()
 	return 0;
 }
 
-void RIG_FTX_1::set_noise(bool b)
-{
-	if (b) cmd = "NR01;";
-	else   cmd = "NR00;";
+// The FTX-1 has no NB or NR on/off command; level 0 is off.
+//   NL P1 P2P2P2  noise blanker level 000 off, 001 - 010
+//   RL P1 P2P2    noise reduction (DNR) level 00 off, 01 - 10
+// The driver keeps the on/off state and level it last sent or read.
+// While a function is off its level is only saved, so that setting the
+// level does not turn it back on.
+
+/// send NL (noise blanker) or RL (noise reduction) for the active side
+void RIG_FTX_1::set_dsp_level(const char *command, int digits, int level) {
+	cmd.assign(command).append(1, active_side());
+	cmd.append(to_decimal(level, digits)).append(";");
 	set_trace(1, __func__);
-	sendCommand (cmd);
+	sendCommand(cmd);
 	sett("");
 	showresp(WARN, ASC, __func__, cmd, replystr);
+}
+
+/// read NL or RL for the active side, -1 if no valid reply
+int RIG_FTX_1::get_dsp_level(const char *command, int digits) {
+	cmd.assign(command).append(1, active_side()).append(";");
+	get_trace(1, __func__);
+	wait_char(';', 4 + digits, FTX_1_WAIT_TIME, __func__, ASC);
+	gett("");
+
+	size_t pos = replystr.rfind(command);
+	if (pos == std::string::npos || pos + 3 + digits >= replystr.length()) {
+		return -1;
+	}
+	return atoi(replystr.substr(pos + 3, digits).c_str());
+}
+
+/// read NL or RL and update the saved on/off state and level
+void RIG_FTX_1::read_dsp(const char *command, int digits,
+	bool &is_on, int &level) {
+	int value = get_dsp_level(command, digits);
+	if (value < 0) {
+		return;
+	}
+	is_on = (value > 0);
+	if (is_on) {
+		level = dsp_level(value);
+	}
+}
+
+// noise blanker on/off
+void RIG_FTX_1::set_noise(bool on)
+{
+	m_nb_on = on;
+	set_dsp_level("NL", 3, on ? m_nb_level : 0);
 }
 
 int RIG_FTX_1::get_noise()
 {
-	cmd = "NR0;";
-	get_trace(1, __func__);
-	wait_char(';',5, FTX_1_WAIT_TIME, __func__, ASC);
-	gett("");
-
-	size_t p = replystr.rfind("NR0");
-	if (p == std::string::npos) return 0;
-	return replystr[p+3] - '0';
+	read_dsp("NL", 3, m_nb_on, m_nb_level);
+	return m_nb_on;
 }
 
-void RIG_FTX_1::set_nb_level(int val) 
+void RIG_FTX_1::set_nb_level(int val)
 {
-	cmd = "RL000;";
-	for (int i = 4; i > 2; i--) {
-		cmd[i] += val % 10;
-		val /= 10;
+	m_nb_level = dsp_level(val);
+	if (m_nb_on) {
+		set_dsp_level("NL", 3, m_nb_level);
 	}
-	set_trace(1, __func__);
-	sendCommand(cmd);
-	sett("");
-	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
-int RIG_FTX_1::get_nb_level() 
-{ 
-	cmd = "RL0;";
-	get_trace(1, __func__);
-	wait_char(';', 7, FTX_1_WAIT_TIME, __func__, ASC);
-	gett("");
-	size_t p = replystr.rfind("RL0");
-	if (p == std::string::npos) return 0;
-
-	int val = atoi(&replystr[p+3]);
-	return val;
+int RIG_FTX_1::get_nb_level()
+{
+	read_dsp("NL", 3, m_nb_on, m_nb_level);
+	return m_nb_level;
 }
 
+// noise reduction (DNR) on/off
 void RIG_FTX_1::set_noise_reduction(int val)
 {
-	if (val) cmd = "NB01;";
-	else     cmd = "NB00;";
-	set_trace(1, __func__);
-	sendCommand (cmd);
-	sett("");
-	showresp(WARN, ASC, __func__, cmd, replystr);
+	m_nr_on = (val != 0);
+	set_dsp_level("RL", 2, m_nr_on ? m_nr_level : 0);
 }
 
 int  RIG_FTX_1::get_noise_reduction()
 {
-	cmd = "NB0;";
-	get_trace(1, __func__);
-	wait_char(';', 5, FTX_1_WAIT_TIME, __func__, ASC);
-	gett("");
-
-	size_t p = replystr.rfind("NB0");
-	if (p == std::string::npos) return 0;
-	return replystr[p+3] - '0';
+	read_dsp("RL", 2, m_nr_on, m_nr_level);
+	return m_nr_on;
 }
 
 void RIG_FTX_1::set_noise_reduction_val(int val)
 {
-	cmd = "NL0000;";
-	for (int i = 5; i > 2; i--) {
-		cmd[i] += val % 10;
-		val /= 10;
+	m_nr_level = dsp_level(val);
+	if (m_nr_on) {
+		set_dsp_level("RL", 2, m_nr_level);
 	}
-	set_trace(1, __func__);
-	sendCommand(cmd);
-	sett("");
-	showresp(WARN, ASC, __func__, cmd, replystr);
 }
 
 int  RIG_FTX_1::get_noise_reduction_val()
 {
-	cmd = "NL0;";
-	get_trace(1, __func__);
-	wait_char(';', 7, FTX_1_WAIT_TIME, __func__, ASC);
-	gett("");
-	size_t p = replystr.rfind("NL0");
-	if (p == std::string::npos) return 0;
-
-	int val = atoi(&replystr[p+3]);
-	return val;
+	read_dsp("RL", 2, m_nr_on, m_nr_level);
+	return m_nr_level;
 }
 
 // val 0 .. 100

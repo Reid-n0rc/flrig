@@ -32,6 +32,15 @@ private:
 	char active_side();
 	bool fixed_width(int mode);
 	void set_width(char side, int bw_index);
+	void set_dsp_level(const char *command, int digits, int level);
+	int  get_dsp_level(const char *command, int digits);
+	void read_dsp(const char *command, int digits, bool &is_on, int &level);
+
+/// noise blanker / noise reduction state last sent or read
+	bool m_nb_on;
+	int  m_nb_level;
+	bool m_nr_on;
+	int  m_nr_level;
 protected:
 	int  preamp_level;
 	int  atten_level;
@@ -124,17 +133,17 @@ public:
 	void set_auto_notch(int v);
 	int  get_auto_notch();
 
-	void set_noise(bool b); // noise reduction
+	void set_noise(bool on); // noise blanker
 	int  get_noise();
 	void get_nb_min_max_step(int &min, int &max, int &step) {
-		min = 1; max = 15; step = 1; }
+		min = 1; max = 10; step = 1; }
 	void set_nb_level(int val);
 	int  get_nb_level();
 
-	void set_noise_reduction_val(int val); // noise blanker
+	void set_noise_reduction_val(int val); // noise reduction (DNR)
 	int  get_noise_reduction_val();
 	void get_nr_min_max_step(int &min, int &max, int &step) {
-		min = 0; max = 10; step = 1; }
+		min = 1; max = 10; step = 1; }
 
 	void set_noise_reduction(int val);
 	int  get_noise_reduction();
