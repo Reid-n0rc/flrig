@@ -1202,10 +1202,8 @@ int RIG_FT710::get_modetype(int n)
 
 void RIG_FT710::set_if_shift(int val)
 {
-	if (inuse == onB)
-		cmd = "IS10+0000;";
-	else
-		cmd = "IS00+0000;";
+/// IS P1 is fixed at 0 (manual p.14); there is one IF shift for A and B
+	cmd = "IS00+0000;";
 	if (val != 0) progStatus.shift = true;
 	else progStatus.shift = false;
 	if (val < 0) cmd[4] = '-';
@@ -1325,10 +1323,8 @@ void RIG_FT710::get_notch_min_max_step(int &min, int &max, int &step)
 
 void RIG_FT710::set_auto_notch(int v)
 {
-	if (inuse == onB)
-		cmd = "BC10;";
-	else
-		cmd = "BC00;";
+/// BC P1 is fixed at 0 (manual p.7); the radio answers ?; to BC1
+	cmd = "BC00;";
 	if (v) cmd[3] = '1';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET auto notch", cmd, replystr);
@@ -1349,10 +1345,8 @@ int  RIG_FT710::get_auto_notch()
 
 void RIG_FT710::set_noise(bool b)
 {
-	if (inuse == onB)
-		cmd = "NB10;";
-	else
-		cmd = "NB00;";
+/// NB P1 is fixed at 0 (manual p.17); there is one NB for A and B
+	cmd = "NB00;";
 
 	nb_state = b;
 
