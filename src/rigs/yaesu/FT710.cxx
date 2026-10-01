@@ -1,4 +1,4 @@
-   // ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Copyright (C) 2023
 //              David Freese, W1HKJ
 //
@@ -18,130 +18,167 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // ----------------------------------------------------------------------------
 
-// comment out for distribution
-//#define TESTING 1
+#include "yaesu/FT710.h"
 
-#include <iostream>
 #include <sstream>
 
-#include "yaesu/FT710.h"
 #include "debug.h"
 #include "support.h"
 
+// mode index
 enum mFT710 {
-   mLSB, mUSB, mCW_U, mFM, mAM, mRTTY_L, mCW_L, mDATA_L, mRTTY_U, mDATA_FM, mFM_N, mDATA_U, mAM_N, mPSK, mDATA_FMN };
-//  0,    1,    2,    3,    4,    5,       6,     7,      8,       9,        10,    11,      12,    13,      14		// mode index
+	mLSB, mUSB, mCW_U, mFM, mAM, mRTTY_L, mCW_L, mDATA_L, mRTTY_U,
+	mDATA_FM, mFM_N, mDATA_U, mAM_N, mPSK, mDATA_FMN };
 
-static const char FT710name_[] = "FT-710";
+static const char FT710_NAME[] = "FT-710";
 
 #undef  NUM_MODES
 #define NUM_MODES  15
 
-static int defBW_narrow[NUM_MODES] = {
-//  mLSB, mUSB, mCW_U, mFM, mAM, mRTTY_L, mCW_L, mDATA_L, mRTTY_U, mDATA_FM, mFM_N, mDATA_U, mAM_N, mPSK, mDATA_FMN };
-//  0,    1,    2,    3,    4,    5,       6,     7,      8,       9,        10,    11,      12,    13,      14		// mode index
-	6,    6,    9,    0,    0,   10,       9,     6,     10,       0,         0,     6,       0,     5,       0 
-};
-static int defBW_wide[NUM_MODES] = {
-//  mLSB, mUSB, mCW_U, mFM, mAM, mRTTY_L, mCW_L, mDATA_L, mRTTY_U, mDATA_FM, mFM_N, mDATA_U, mAM_N, mPSK, mDATA_FMN };
-//  0,    1,    2,    3,    4,    5,       6,     7,      8,       9,        10,    11,      12,    13,      14		// mode index
-	13,  13,   16,    0,    0,   10,      16,    17,     10,       0,         0,    17,       0,     9,       0 
-};
+// default bandwidth index for each mode index, narrow
+static const int FT710_DEF_BW_NARROW[NUM_MODES] = {
+// LSB, USB, CW-U, FM, AM
+	 6,  6,  9,  0,  0,
+// RTTY-L, CW-L, DATA-L, RTTY-U, DATA-FM
+	10,  9,  6, 10,  0,
+// FM-N, DATA-U, AM-N, PSK, DATA-FMN
+	 0,  6,  0,  5,  0 };
 
-static int mode_bwA[NUM_MODES] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-static int mode_bwB[NUM_MODES] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+// default bandwidth index for each mode index, wide
+static const int FT710_DEF_BW_WIDE[NUM_MODES] = {
+// LSB, USB, CW-U, FM, AM
+	13, 13, 16,  0,  0,
+// RTTY-L, CW-L, DATA-L, RTTY-U, DATA-FM
+	10, 16, 17, 10,  0,
+// FM-N, DATA-U, AM-N, PSK, DATA-FMN
+	 0, 17,  0,  9,  0 };
 
-static std::vector<std::string>FT710modes_;
-static const char *vmd[] = {
-"LSB", "USB", "CW-U", "FM", "AM", 
-"RTTY-L", "CW-L", "DATA-L", "RTTY-U", "DATA-FM",
-"FM-N", "DATA-U", "AM-N", "PSK", "DATA-FMN"};
+// bandwidth index last used in each mode, -1 if not yet used
+static int mode_bwA[NUM_MODES] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+static int mode_bwB[NUM_MODES] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
-static const char FT710_mode_chr[] =  { '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
-static const char FT710_mode_type[] = { 'L', 'U', 'U', 'U', 'U', 'L', 'L', 'L', 'U', 'U', 'U', 'U', 'U', 'U', 'U' };
+static std::vector<std::string> ft710_modes;
+static const char *FT710_MODE_NAMES[] = {
+	"LSB",    "USB",    "CW-U",   "FM",     "AM",
+	"RTTY-L", "CW-L",   "DATA-L", "RTTY-U", "DATA-FM",
+	"FM-N",   "DATA-U", "AM-N",   "PSK",    "DATA-FMN" };
 
-static std::vector<std::string>FT710_widths_SSB;
-static const char *vssb[] = {
- "300",  "400",  "600",  "850", "1100", 	// 1 ... 5
-"1200", "1500", "1650", "1800", "1950",		// 6 ... 10
-"2100", "2250", "2400", "2450", "2500",		// 7 ... 15
-"2600", "2700", "2800", "2900", "3000",		// 16 ... 20
-"3200", "3500", "4000" };				// 21 ... 23
+// MD P2 mode character for each mode index
+static const char FT710_MODE_CHR[] = {
+	'1', '2', '3', '4', '5',
+	'6', '7', '8', '9', 'A',
+	'B', 'C', 'D', 'E', 'F' };
 
-static int FT710_wvals_SSB[] = {
-1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23, WVALS_LIMIT};
+static const char FT710_MODE_TYPE[] = {
+	'L', 'U', 'U', 'U', 'U',
+	'L', 'L', 'L', 'U', 'U',
+	'U', 'U', 'U', 'U', 'U' };
 
-static std::vector<std::string>FT710_widths_CW;
-static const char *vcww[] = {
-  "50",  "100",  "150",  "200",  "250",		// 1 ... 5
- "300",  "350",  "400",  "450",  "500",		// 6 ... 10
- "600",  "800", "1200", "1400", "1700",		// 11 ... 15
-"2000", "2400", "3000", "3200", "3500",		// 16 .. 20
-"4000" };								// 21
+// SSB widths, SH P3 codes 01 - 23
+static std::vector<std::string> ft710_widths_ssb;
+static const char *FT710_WIDTHS_SSB[] = {
+	 "300",  "400",  "600",  "850", "1100",
+	"1200", "1500", "1650", "1800", "1950",
+	"2100", "2250", "2400", "2450", "2500",
+	"2600", "2700", "2800", "2900", "3000",
+	"3200", "3500", "4000" };
 
-static int FT710_wvals_CW[] = {
-1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18, 19, 20, 21, WVALS_LIMIT };
+static const int FT710_WVALS_SSB[] = {
+	 1,  2,  3,  4,  5,
+	 6,  7,  8,  9, 10,
+	11, 12, 13, 14, 15,
+	16, 17, 18, 19, 20,
+	21, 22, 23, WVALS_LIMIT };
 
-static std::vector<std::string>FT710_widths_RTTY;
-static const char *vrtty[] = {
-  "50",  "100",  "150",  "200",  "250",		// 1 ... 5
- "300",  "350",  "400",  "450",  "500",		// 6 ... 10
- "600",  "800", "1200", "1400", "1700",		// 11 ... 15
-"2000", "2400", "3000", "3200", "3500",		// 16 .. 20
-"4000" };								// 21
+// CW widths, SH P3 codes 01 - 21
+static std::vector<std::string> ft710_widths_cw;
+static const char *FT710_WIDTHS_CW[] = {
+	  "50",  "100",  "150",  "200",  "250",
+	 "300",  "350",  "400",  "450",  "500",
+	 "600",  "800", "1200", "1400", "1700",
+	"2000", "2400", "3000", "3200", "3500",
+	"4000" };
 
-static int FT710_wvals_RTTY[] = {
-1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18, 19, 20, 21, WVALS_LIMIT };
+static const int FT710_WVALS_CW[] = {
+	 1,  2,  3,  4,  5,
+	 6,  7,  8,  9, 10,
+	11, 12, 13, 14, 15,
+	16, 17, 18, 19, 20,
+	21, WVALS_LIMIT };
 
-static std::vector<std::string>FT710_widths_DATA;
-static const char *vdata[] = {
-  "50",  "100",  "150",  "200",  "250",		// 1 ... 5
- "300",  "350",  "400",  "450",  "500",		// 6 ... 10
- "600",  "800", "1200", "1400", "1700",		// 11 ... 15
-"2000", "2400", "3000", "3200", "3500",		// 16 .. 20
-"4000" };								// 21
+// RTTY widths, SH P3 codes 01 - 21
+static std::vector<std::string> ft710_widths_rtty;
+static const char *FT710_WIDTHS_RTTY[] = {
+	  "50",  "100",  "150",  "200",  "250",
+	 "300",  "350",  "400",  "450",  "500",
+	 "600",  "800", "1200", "1400", "1700",
+	"2000", "2400", "3000", "3200", "3500",
+	"4000" };
 
-static int FT710_wvals_PSK[] = {
-1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18, 19, 20, 21, WVALS_LIMIT };
+static const int FT710_WVALS_RTTY[] = {
+	 1,  2,  3,  4,  5,
+	 6,  7,  8,  9, 10,
+	11, 12, 13, 14, 15,
+	16, 17, 18, 19, 20,
+	21, WVALS_LIMIT };
 
-static const int FT710_wvals_AMFM[] = { 0, WVALS_LIMIT };
+// DATA and PSK widths, SH P3 codes 01 - 21
+static std::vector<std::string> ft710_widths_data;
+static const char *FT710_WIDTHS_DATA[] = {
+	  "50",  "100",  "150",  "200",  "250",
+	 "300",  "350",  "400",  "450",  "500",
+	 "600",  "800", "1200", "1400", "1700",
+	"2000", "2400", "3000", "3200", "3500",
+	"4000" };
 
-static std::vector<std::string>FT710_widths_AMwide;
-static const char *vamw[] = { "9000" };
-static std::vector<std::string>FT710_widths_AMnar;
-static const char *vamn[] = { "6000" };
-static std::vector<std::string>FT710_widths_FMnar;
-static const char *vfmn[] = { "9000" };
-static std::vector<std::string>FT710_widths_FMwide;
-static const char *vfmw[] = { "16000" };
-static std::vector<std::string>FT710_widths_DATA_FM;
-static const char *vfmd[]  = { "16000" };
-static std::vector<std::string>FT710_widths_DATA_FMN;
-static const char *vfmdn[] = { "9000" };
+static const int FT710_WVALS_PSK[] = {
+	 1,  2,  3,  4,  5,
+	 6,  7,  8,  9, 10,
+	11, 12, 13, 14, 15,
+	16, 17, 18, 19, 20,
+	21, WVALS_LIMIT };
+
+// Single bandwidth modes
+static const int FT710_WVALS_AMFM[] = { 0, WVALS_LIMIT };
+
+static std::vector<std::string> ft710_widths_am_wide;
+static const char *FT710_WIDTHS_AM_WIDE[] = { "9000" };
+static std::vector<std::string> ft710_widths_am_nar;
+static const char *FT710_WIDTHS_AM_NAR[] = { "6000" };
+static std::vector<std::string> ft710_widths_fm_nar;
+static const char *FT710_WIDTHS_FM_NAR[] = { "9000" };
+static std::vector<std::string> ft710_widths_fm_wide;
+static const char *FT710_WIDTHS_FM_WIDE[] = { "16000" };
+static std::vector<std::string> ft710_widths_data_fm;
+static const char *FT710_WIDTHS_DATA_FM[] = { "16000" };
+static std::vector<std::string> ft710_widths_data_fmn;
+static const char *FT710_WIDTHS_DATA_FMN[] = { "9000" };
 
 /// 60 m combo entries: VFO selects the 5 MHz band (BS02), the others
 /// are the radio's 5 MHz memory channels, MC 5xx (manual p.15).  A US
 /// FT-710 has 501-505 at 5330.5, 5346.5, 5357.0, 5371.5 and 5403.5 kHz
 /// USB, and 506-510 at the same channels 1.5 kHz up in CW.  The radio
 /// holds the frequencies, so only the channel numbers are listed here.
-static std::vector<std::string>FT710_60m;
-static const char *v60m[] = {
+static std::vector<std::string> ft710_60m;
+static const char *FT710_60M[] = {
 	"VFO", "501", "502", "503", "504", "505",
 	"506", "507", "508", "509", "510"
 };
 
 //----------------------------------------------------------------------
-static std::vector<std::string>FT710_att_labels;
-static const char *vFT710_att_labels[] = { "ATT", "6 dB", "12 dB", "18 dB"};
+static std::vector<std::string> ft710_att_labels;
+static const char *FT710_ATT_LABELS[] = { "ATT", "6 dB", "12 dB", "18 dB" };
 
-static std::vector<std::string>FT710_pre_labels;
-static const char *vFT710_pre_labels[] = { "IPO", "Amp 1", "Amp 2" };
+static std::vector<std::string> ft710_pre_labels;
+static const char *FT710_PRE_LABELS[] = { "IPO", "Amp 1", "Amp 2" };
 
-static std::vector<std::string>FT710_nb_labels;
-static const char *vFT710_nb_labels[] = { "NB", "NB on" };
+static std::vector<std::string> ft710_nb_labels;
+static const char *FT710_NB_LABELS[] = { "NB", "NB on" };
 //----------------------------------------------------------------------
 
-static GUI rig_widgets[]= {
+static GUI rig_widgets[] = {
 	{ (Fl_Widget *)btnVol,        2, 125,  50 }, // 0
 	{ (Fl_Widget *)sldrVOLUME,   54, 125, 368 }, // 1
 	{ (Fl_Widget *)sldrRFGAIN,   54, 145, 156 }, // 2
@@ -161,35 +198,35 @@ static GUI rig_widgets[]= {
 	{ (Fl_Widget *)NULL,          0,   0,   0 }
 };
 
-void RIG_FT710::initialize()
-{
-	name_ = FT710name_;
+/// build the tables, turn Auto Information off and set up the 60 m combo
+void RIG_FT710::initialize() {
+	name_ = FT710_NAME;
 
-	VECTOR(FT710modes_, vmd);
-	VECTOR(FT710_widths_SSB, vssb);
-	VECTOR(FT710_widths_CW, vcww);
-	VECTOR(FT710_widths_RTTY, vrtty);
-	VECTOR(FT710_widths_DATA, vdata);
-	VECTOR(FT710_widths_AMwide, vamw);
-	VECTOR(FT710_widths_AMnar, vamn);
-	VECTOR(FT710_widths_FMnar, vfmn);
-	VECTOR(FT710_widths_FMwide, vfmw);
-	VECTOR(FT710_widths_DATA_FM, vfmd);
-	VECTOR(FT710_widths_DATA_FMN, vfmdn);
-	VECTOR(FT710_60m, v60m);
+	VECTOR(ft710_modes, FT710_MODE_NAMES);
+	VECTOR(ft710_widths_ssb, FT710_WIDTHS_SSB);
+	VECTOR(ft710_widths_cw, FT710_WIDTHS_CW);
+	VECTOR(ft710_widths_rtty, FT710_WIDTHS_RTTY);
+	VECTOR(ft710_widths_data, FT710_WIDTHS_DATA);
+	VECTOR(ft710_widths_am_wide, FT710_WIDTHS_AM_WIDE);
+	VECTOR(ft710_widths_am_nar, FT710_WIDTHS_AM_NAR);
+	VECTOR(ft710_widths_fm_nar, FT710_WIDTHS_FM_NAR);
+	VECTOR(ft710_widths_fm_wide, FT710_WIDTHS_FM_WIDE);
+	VECTOR(ft710_widths_data_fm, FT710_WIDTHS_DATA_FM);
+	VECTOR(ft710_widths_data_fmn, FT710_WIDTHS_DATA_FMN);
+	VECTOR(ft710_60m, FT710_60M);
 
-	VECTOR (FT710_att_labels, vFT710_att_labels);
-	att_labels_ = FT710_att_labels;
+	VECTOR(ft710_att_labels, FT710_ATT_LABELS);
+	att_labels_ = ft710_att_labels;
 
-	VECTOR (FT710_pre_labels, vFT710_pre_labels);
-	pre_labels_ = FT710_pre_labels;
+	VECTOR(ft710_pre_labels, FT710_PRE_LABELS);
+	pre_labels_ = ft710_pre_labels;
 
-	VECTOR (FT710_nb_labels, vFT710_nb_labels);
-	nb_labels_ = FT710_nb_labels;
+	VECTOR(ft710_nb_labels, FT710_NB_LABELS);
+	nb_labels_ = ft710_nb_labels;
 
-	modes_ = FT710modes_;
-	bandwidths_ = FT710_widths_SSB;
-	bw_vals_ = FT710_wvals_SSB;
+	modes_ = ft710_modes;
+	bandwidths_ = ft710_widths_ssb;
+	bw_vals_ = FT710_WVALS_SSB;
 
 	rig_widgets[0].W = btnVol;
 	rig_widgets[1].W = sldrVOLUME;
@@ -204,7 +241,6 @@ void RIG_FT710::initialize()
 	rig_widgets[10].W = sldrIFSHIFT;
 	rig_widgets[11].W = sldrPOWER;
 
-
 	cmd = "AI0;";
 	sendCommand(cmd);
 	showresp(WARN, ASC, "Auto Info OFF", cmd, replystr);
@@ -213,8 +249,8 @@ void RIG_FT710::initialize()
 	set_cw_spot();
 
 	op_yaesu_select60->clear();
-	for (size_t entry = 0; entry < FT710_60m.size(); entry++) {
-		op_yaesu_select60->add(FT710_60m[entry].c_str());
+	for (size_t entry = 0; entry < ft710_60m.size(); entry++) {
+		op_yaesu_select60->add(ft710_60m[entry].c_str());
 	}
 	op_yaesu_select60->index(m_60m_indx);
 	op_yaesu_select60->activate();
@@ -222,13 +258,14 @@ void RIG_FT710::initialize()
 	get_vfoAorB();
 }
 
+/// base class values and the controls the FT-710 supports
 RIG_FT710::RIG_FT710() {
 // base class values
 	IDstr = "ID";
-	name_ = FT710name_;
-	modes_ = FT710modes_;
-	bandwidths_ = FT710_widths_SSB;
-	bw_vals_ = FT710_wvals_SSB;
+	name_ = FT710_NAME;
+	modes_ = ft710_modes;
+	bandwidths_ = ft710_widths_ssb;
+	bw_vals_ = FT710_WVALS_SSB;
 
 	widgets = rig_widgets;
 
@@ -251,8 +288,6 @@ RIG_FT710::RIG_FT710() {
 	A.iBW = B.iBW = bwA = bwB = def_bw = 0;
 	A.freq = B.freq = freqA = freqB = def_freq = 14070000ULL;
 
-	notch_on = false;
-
 	has_band_selection =
 	has_extras =
 	has_vox_onoff =
@@ -263,9 +298,7 @@ RIG_FT710::RIG_FT710() {
 
 	has_cw_wpm =
 	has_cw_keyer =
-//	has_cw_vol =
 	has_cw_spot =
-//	has_cw_spot_tone = // does not exist???
 	has_cw_qsk =
 	has_cw_weight =
 	has_cw_break_in =
@@ -295,13 +328,13 @@ RIG_FT710::RIG_FT710() {
 	has_preamp_control =
 	has_ifshift_control =
 	has_ptt_control =
-	has_tune_control = 
+	has_tune_control =
 	has_xcvr_auto_on_off = true;
 
 // derived specific
 	atten_state = 0;
 	preamp_state = 0;
-	notch_on = false;
+	m_notch_on = false;
 	m_60m_indx = 0;
 
 	for (int meter = 0; meter < 9; meter++) {
@@ -314,15 +347,15 @@ RIG_FT710::RIG_FT710() {
 
 	precision = 1;
 	ndigits = 8;
-
 }
 
-void RIG_FT710::set_xcvr_auto_on()
-{
+/// PS1, turn the radio on unless it already answers ID
+void RIG_FT710::set_xcvr_auto_on() {
 	cmd = "ID;";
-	wait_char(';', 7 , 100, "check", ASC);
-	if (replystr.find("ID") != std::string::npos)
+	wait_char(';', 7, 100, "check", ASC);
+	if (replystr.find("ID") != std::string::npos) {
 		return;
+	}
 
 // wait 1.2 seconds
 	for (int i = 0; i < 12; i++) {
@@ -349,25 +382,25 @@ void RIG_FT710::set_xcvr_auto_on()
 	}
 }
 
-void RIG_FT710::set_xcvr_auto_off()
-{
+/// PS0, turn the radio off
+void RIG_FT710::set_xcvr_auto_off() {
 	sendCommand("PS0;");
 	sett("set_xcvr_auto_off");
 
 // transceiver does not respond after a power OFF
-
 	for (int i = 0; i < 100; i++) {
 		cmd = "PS;";
 		wait_char(';', 4, 100, "Test for xcvr OFF", ASC);
-		if (replystr.empty()) break;
+		if (replystr.empty()) {
+			break;
+		}
 		Fl::awake();
 	}
 }
 
 /// Band buttons 1-11 (1.8 MHz to GEN) select band stacks BS00-BS11,
 /// skipping BS02; the 60 m combo calls with 13.
-void RIG_FT710::get_band_selection(int v)
-{
+void RIG_FT710::get_band_selection(int band) {
 	cmd = "IF;";
 	wait_char(';', 28, 100, "get band", ASC);
 
@@ -377,45 +410,39 @@ void RIG_FT710::get_band_selection(int v)
 	if (pos == std::string::npos) {
 		return;
 	}
-/// IF P7 is 0 for VFO, otherwise a memory channel is in use
+// IF P7 is 0 for VFO, otherwise a memory channel is in use
 	if (replystr[pos + 22] != '0') {
 		cmd = "VM;";
 		sendCommand(cmd);
 		showresp(WARN, ASC, "VFO mode", cmd, replystr);
 	}
 
-	if (v == 13) {
+	if (band == 13) {
 		m_60m_indx = op_yaesu_select60->index();
-		if (m_60m_indx > 0 && m_60m_indx < (int)FT710_60m.size()) {
-			cmd.assign("MC").append(FT710_60m[m_60m_indx]).append(";");
+		if (m_60m_indx > 0 && m_60m_indx < (int)ft710_60m.size()) {
+			cmd.assign("MC").append(ft710_60m[m_60m_indx]).append(";");
 		} else {
 			cmd = "BS02;";
 		}
 	} else {
-		if (v < 3) {
-			v = v - 1;
+		if (band < 3) {
+			band = band - 1;
 		}
-		cmd.assign("BS").append(to_decimal(v, 2)).append(";");
+		cmd.assign("BS").append(to_decimal(band, 2)).append(";");
 	}
 
 	sendCommand(cmd);
 	showresp(WARN, ASC, "Select Band Stacks", cmd, replystr);
 }
 
-//static std::string Avfo = "FA014070000;";
-//static std::string Bvfo = "FB007070000;";
-
-bool RIG_FT710::check ()
-{
-#ifdef TESTING
-return true;
-#endif
+/// true if the radio answers ID
+bool RIG_FT710::check() {
 	cmd = "ID;";
-	wait_char(';', 7 , 500, "check", ASC);
-//std::cout << "check: " << replystr << std::endl;
+	wait_char(';', 7, 500, "check", ASC);
 
-	if (replystr.find("ID") == std::string::npos)
+	if (replystr.find("ID") == std::string::npos) {
 		return false;
+	}
 	return true;
 }
 
@@ -423,8 +450,7 @@ return true;
 /// prefix and is length characters long, ';' included, or npos.  A
 /// reply left over from an earlier command is never parsed as this
 /// command's reply.
-size_t RIG_FT710::last_frame(const char *prefix, size_t length)
-{
+size_t RIG_FT710::last_frame(const char *prefix, size_t length) {
 	size_t pos = replystr.rfind(prefix);
 	if (pos == std::string::npos || pos + length > replystr.length() ||
 		replystr[pos + length - 1] != ';') {
@@ -437,8 +463,8 @@ size_t RIG_FT710::last_frame(const char *prefix, size_t length)
 	return pos;
 }
 
-unsigned long long RIG_FT710::get_vfoA ()
-{
+/// FA, VFO A frequency
+unsigned long long RIG_FT710::get_vfoA() {
 	cmd = "FA";
 	cmd += ';';
 	wait_char(';', 12, 100, "get vfo A", ASC);
@@ -449,29 +475,30 @@ unsigned long long RIG_FT710::get_vfoA ()
 		return freqA;
 	}
 
-	unsigned long long f = 0;
+	unsigned long long frequency = 0;
 
-	sscanf(&replystr[pos], "FA%lld", &f);
-	if (f)
-		freqA = f;
+	sscanf(&replystr[pos], "FA%lld", &frequency);
+	if (frequency) {
+		freqA = frequency;
+	}
 	return freqA;
 }
 
-void RIG_FT710::set_vfoA (unsigned long long freq)
-{
-	freqA = freq;
+/// FA, VFO A frequency
+void RIG_FT710::set_vfoA(unsigned long long frequency) {
+	freqA = frequency;
 	cmd = "FA000000000;";
 	for (int i = 10; i > 1; i--) {
-		cmd[i] += freq % 10;
-		freq /= 10;
+		cmd[i] += frequency % 10;
+		frequency /= 10;
 	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET vfo A", cmd, replystr);
 	sett("SET vfo A");
 }
 
-unsigned long long RIG_FT710::get_vfoB ()
-{
+/// FB, VFO B frequency
+unsigned long long RIG_FT710::get_vfoB() {
 	cmd = rsp = "FB";
 	cmd += ';';
 	wait_char(';', 12, 100, "get vfo B", ASC);
@@ -482,49 +509,47 @@ unsigned long long RIG_FT710::get_vfoB ()
 		return freqB;
 	}
 
-	unsigned long long f = 0;
-	sscanf(&replystr[pos], "FB%lld", &f);
-	if (f)
-		freqB = f;
+	unsigned long long frequency = 0;
+	sscanf(&replystr[pos], "FB%lld", &frequency);
+	if (frequency) {
+		freqB = frequency;
+	}
 	return freqB;
 }
 
-
-void RIG_FT710::set_vfoB (unsigned long long freq)
-{
-	freqB = freq;
+/// FB, VFO B frequency
+void RIG_FT710::set_vfoB(unsigned long long frequency) {
+	freqB = frequency;
 	cmd = "FB000000000;";
 	for (int i = 10; i > 1; i--) {
-		cmd[i] += freq % 10;
-		freq /= 10;
+		cmd[i] += frequency % 10;
+		frequency /= 10;
 	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET vfo B", cmd, replystr);
 	sett("SET vfo B");
 }
 
-
-bool RIG_FT710::twovfos()
-{
+/// the FT-710 has VFO A and VFO B
+bool RIG_FT710::twovfos() {
 	return true;
 }
 
-int RIG_FT710::get_vfoAorB()
-{
+/// VS, the VFO in use
+int RIG_FT710::get_vfoAorB() {
 	cmd = "VS;";
 	rsp = "VS";
 	wait_char(';', 4, 100, "get vfoAorB()", ASC);
 	gett("get vfoAorB()");
-	size_t p = replystr.rfind(rsp);
-//	inuse = onA;
-	if (p != std::string::npos)
-		inuse = (replystr[p + 2] == '1') ? onB : onA;
+	size_t pos = replystr.rfind(rsp);
+	if (pos != std::string::npos) {
+		inuse = (replystr[pos + 2] == '1') ? onB : onA;
+	}
 	return inuse;
 }
 
-
-void RIG_FT710::selectA()
-{
+/// VS0, use VFO A
+void RIG_FT710::selectA() {
 	cmd = "VS0;";
 	sendCommand(cmd);
 	showresp(WARN, ASC, "select A", cmd, replystr);
@@ -532,8 +557,8 @@ void RIG_FT710::selectA()
 	inuse = onA;
 }
 
-void RIG_FT710::selectB()
-{
+/// VS1, use VFO B
+void RIG_FT710::selectB() {
 	cmd = "VS1;";
 	sendCommand(cmd);
 	showresp(WARN, ASC, "select B", cmd, replystr);
@@ -541,23 +566,23 @@ void RIG_FT710::selectB()
 	inuse = onB;
 }
 
-void RIG_FT710::A2B()
-{
+/// AB, copy VFO A to VFO B
+void RIG_FT710::A2B() {
 	cmd = "AB;";
 	sendCommand(cmd);
 	showresp(WARN, ASC, "vfo A --> B", cmd, replystr);
 	sett("A2B()");
 }
 
-bool RIG_FT710::can_split()
-{
+/// split is available
+bool RIG_FT710::can_split() {
 	return true;
 }
 
-void RIG_FT710::set_split(bool val)
-{
-	split = val;
-	if (val) {
+/// ST, split on or off
+void RIG_FT710::set_split(bool split_on) {
+	split = split_on;
+	if (split_on) {
 		cmd = "ST1;";
 		sendCommand(cmd);
 		sett("Split ON");
@@ -568,32 +593,32 @@ void RIG_FT710::set_split(bool val)
 	}
 }
 
-int RIG_FT710::get_split()
-{
+/// FT, split is on when the transmitter is not on the main VFO
+int RIG_FT710::get_split() {
 	cmd = rsp = "FT";
 	cmd += ";";
 	wait_char(';', 4, 100, "Get split", ASC);
 	gett("get split()");
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return 0;
-	int split = replystr[p+2] - '0';
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return 0;
+	}
+	int tx_vfo = replystr[pos + 2] - '0';
 
-	return (split > 0);
+	return (tx_vfo > 0);
 }
 
-void RIG_FT710::swapAB()
-{
+/// SV, swap VFO A and VFO B
+void RIG_FT710::swapAB() {
 	cmd = "SV;";
 	sendCommand(cmd);
 	sett("swapAB()");
 }
 
-
 /// S meter, SM0 (manual p.20): answer SM0 P2P2P2 ; is 7 characters.
 /// Returns -1, which leaves the S meter unchanged, when the reply is
 /// missing or is the reply to another command.
-int RIG_FT710::get_smeter()
-{
+int RIG_FT710::get_smeter() {
 	cmd = rsp = "SM0";
 	cmd += ';';
 	wait_char(';', 7, 100, "get smeter", ASC);
@@ -605,16 +630,15 @@ int RIG_FT710::get_smeter()
 		return -1;
 	}
 
-	int mtr = atoi(replystr.substr(pos + 3, 3).c_str());
-	mtr = mtr * 100.0 / 256.0;
-	return mtr;
+	int meter = atoi(replystr.substr(pos + 3, 3).c_str());
+	meter = meter * 100.0 / 256.0;
+	return meter;
 }
 
 /// Convert a raw RM reading with a table of {raw, value} points.
 /// Readings below the first point or above the last one take the end
 /// value, so the lookup never runs off the table.
-static double meter_value(const meterpair *table, size_t points, int raw)
-{
+static double meter_value(const meterpair *table, size_t points, int raw) {
 	if (raw <= table[0].mtr) {
 		return table[0].val;
 	}
@@ -682,8 +706,7 @@ static const meterpair VDD_TABLE[] = {
 /// a second answer is read by the next command.  Returns the raw value
 /// 0-255, or the last good value when the reply is missing or is the
 /// reply to another command.
-int RIG_FT710::read_meter(int meter, const char *label)
-{
+int RIG_FT710::read_meter(int meter, const char *label) {
 	char prefix[4];
 	snprintf(prefix, sizeof(prefix), "RM%d", meter);
 
@@ -706,88 +729,89 @@ int RIG_FT710::read_meter(int meter, const char *label)
 	return m_meter_raw[meter];
 }
 
-int RIG_FT710::get_swr()
-{
-	int mtr = read_meter(6, "get swr");
+/// RM6, SWR bar 0 - 100
+int RIG_FT710::get_swr() {
+	int raw = read_meter(6, "get swr");
 
 	int bar = (int)round(meter_value(SWR_TABLE,
-		sizeof(SWR_TABLE) / sizeof(meterpair), mtr));
-	LOG_DEBUG("RM6 %d = SWR bar %d", mtr, bar);
+		sizeof(SWR_TABLE) / sizeof(meterpair), raw));
+	LOG_DEBUG("RM6 %d = SWR bar %d", raw, bar);
 	return bar;
 }
 
-double RIG_FT710::get_idd()
-{
-	int mtr = read_meter(7, "get idd");
+/// RM7, drain current in amps
+double RIG_FT710::get_idd() {
+	int raw = read_meter(7, "get idd");
 
 	double amps = meter_value(IDD_TABLE,
-		sizeof(IDD_TABLE) / sizeof(meterpair), mtr);
-	LOG_DEBUG("RM7 %d = %.1f A", mtr, amps);
+		sizeof(IDD_TABLE) / sizeof(meterpair), raw);
+	LOG_DEBUG("RM7 %d = %.1f A", raw, amps);
 	return amps;
 }
 
-double RIG_FT710::get_voltmeter()
-{
-	int mtr = read_meter(8, "get vdd");
+/// RM8, supply voltage in volts
+double RIG_FT710::get_voltmeter() {
+	int raw = read_meter(8, "get vdd");
 
 	double volts = meter_value(VDD_TABLE,
-		sizeof(VDD_TABLE) / sizeof(meterpair), mtr);
-	LOG_DEBUG("RM8 %d = %.2f V", mtr, volts);
+		sizeof(VDD_TABLE) / sizeof(meterpair), raw);
+	LOG_DEBUG("RM8 %d = %.2f V", raw, volts);
 	return volts;
 }
 
-
-int RIG_FT710::get_power_out()
-{
-	int mtr = read_meter(5, "get pout");
+/// RM5, power out in watts
+int RIG_FT710::get_power_out() {
+	int raw = read_meter(5, "get pout");
 
 	int watts = (int)round(meter_value(POWER_TABLE,
-		sizeof(POWER_TABLE) / sizeof(meterpair), mtr));
-	LOG_DEBUG("RM5 %d = %d W", mtr, watts);
+		sizeof(POWER_TABLE) / sizeof(meterpair), raw));
+	LOG_DEBUG("RM5 %d = %d W", raw, watts);
 	return watts;
 }
 
-int RIG_FT710::get_alc()
-{
-	int mtr = read_meter(4, "get alc");
+/// RM4, ALC meter 0 - 100
+int RIG_FT710::get_alc() {
+	int raw = read_meter(4, "get alc");
 
-	int alc = (int)ceil(mtr / 2.56);
-	LOG_DEBUG("RM4 %d = ALC %d", mtr, alc);
+	int alc = (int)ceil(raw / 2.56);
+	LOG_DEBUG("RM4 %d = ALC %d", raw, alc);
 	return alc;
 }
 
-// Transceiver power level
-double RIG_FT710::get_power_control()
-{
+/// PC, transceiver power level in watts
+double RIG_FT710::get_power_control() {
 	cmd = rsp = "PC";
 	cmd += ';';
 	wait_char(';', 6, 100, "get power", ASC);
 
 	gett("get_power_control()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return progStatus.power_level;
-	if (p + 5 >= replystr.length()) return progStatus.power_level;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return progStatus.power_level;
+	}
+	if (pos + 5 >= replystr.length()) {
+		return progStatus.power_level;
+	}
 
-	int mtr = atoi(&replystr[p+2]);
-	return mtr;
+	int power = atoi(&replystr[pos + 2]);
+	return power;
 }
 
-void RIG_FT710::set_power_control(double val)
-{
-	int ival = (int)val;
+/// PC, transceiver power level in watts
+void RIG_FT710::set_power_control(double watts) {
+	int power = (int)watts;
 	cmd = "PC000;";
 	for (int i = 4; i > 1; i--) {
-		cmd[i] += ival % 10;
-		ival /= 10;
+		cmd[i] += power % 10;
+		power /= 10;
 	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET power", cmd, replystr);
 }
 
-// Volume control return 0 ... 100
-int RIG_FT710::get_volume_control()
-{
+/// AG0, volume control 0 - 100
+int RIG_FT710::get_volume_control() {
 	cmd = rsp = "AG0";
 	cmd += ';';
 	wait_char(';', 7, 100, "get vol", ASC);
@@ -798,17 +822,18 @@ int RIG_FT710::get_volume_control()
 	if (pos == std::string::npos) {
 		return progStatus.volume;
 	}
-	int val = 0;
-	sscanf(&replystr[pos], "AG0%d", &val);
-	val = (int)round(val * 100 / 255.0);
-	if (val > 100) val = 100;
-	return val;
+	int volume = 0;
+	sscanf(&replystr[pos], "AG0%d", &volume);
+	volume = (int)round(volume * 100 / 255.0);
+	if (volume > 100) {
+		volume = 100;
+	}
+	return volume;
 }
 
-void RIG_FT710::set_volume_control(int val) 
-{
-/// AF GAIN is 000-255 (manual p.6)
-	int ivol = (int)round(val * 255 / 100.0);
+/// AG0, volume control 0 - 100; AF GAIN is 000-255 (manual p.6)
+void RIG_FT710::set_volume_control(int volume) {
+	int ivol = (int)round(volume * 255 / 100.0);
 	cmd = "AG0000;";
 	for (int i = 5; i > 2; i--) {
 		cmd[i] += ivol % 10;
@@ -818,33 +843,33 @@ void RIG_FT710::set_volume_control(int val)
 	showresp(WARN, ASC, "SET vol", cmd, replystr);
 }
 
-// Tranceiver PTT on/off
-void RIG_FT710::set_PTT_control(int val)
-{
-	cmd = val ? "TX1;" : "TX0;";
+/// TX, transceiver PTT on/off
+void RIG_FT710::set_PTT_control(int ptt_on) {
+	cmd = ptt_on ? "TX1;" : "TX0;";
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET PTT", cmd, replystr);
-	ptt_ = val;
+	ptt_ = ptt_on;
 }
 
-int RIG_FT710::get_PTT()
-{
+/// TX, transceiver PTT state
+int RIG_FT710::get_PTT() {
 	cmd = "TX;";
 	rsp = "TX";
 	wait_char(';', 4, 100, "get PTT", ASC);
 
 	gett("get_PTT()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return ptt_;
-	ptt_ =  (replystr[p+2] != '0' ? 1 : 0);
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return ptt_;
+	}
+	ptt_ = (replystr[pos + 2] != '0' ? 1 : 0);
 	return ptt_;
 }
 
-
-void RIG_FT710::tune_rig(int val)
-{
-	switch (val) {
+/// AC, tuner off (0), on (1) or start tuning (2)
+void RIG_FT710::tune_rig(int action) {
+	switch (action) {
 		case 0:
 			cmd = "AC000;";
 			break;
@@ -861,206 +886,240 @@ void RIG_FT710::tune_rig(int val)
 	sett("tune_rig");
 }
 
-int RIG_FT710::get_tune()
-{
+/// AC, 1 if the tuner is on
+int RIG_FT710::get_tune() {
 	cmd = rsp = "AC";
 	cmd += ';';
 	wait_char(';', 6, 100, "get tune", ASC);
 
 	rig_trace(2, "get_tuner status()", replystr.c_str());
 
-	size_t p = last_frame("AC", 6);
-	if (p == std::string::npos) return 0;
-	if (replystr[p+4] == '0') return 0;
+	size_t pos = last_frame("AC", 6);
+	if (pos == std::string::npos) {
+		return 0;
+	}
+	if (replystr[pos + 4] == '0') {
+		return 0;
+	}
 	return 1;
 }
 
-
-int  RIG_FT710::next_attenuator()
-{
+/// attenuator cycles off, 6 dB, 12 dB, 18 dB
+int RIG_FT710::next_attenuator() {
 	switch (atten_state) {
-		case 0: return 1;
-		case 1: return 2;
-		case 2: return 3;
-		case 3: return 0;
+		case 0:
+			return 1;
+		case 1:
+			return 2;
+		case 2:
+			return 3;
+		case 3:
+			return 0;
 	}
 	return 0;
 }
 
-void RIG_FT710::set_attenuator(int val)
-{
-	atten_state = val;
+/// RA0, attenuator 0 - 3
+void RIG_FT710::set_attenuator(int atten) {
+	atten_state = atten;
 	cmd = "RA00;";
 	cmd[3] += atten_state;
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET att", cmd, replystr);
 }
 
-int RIG_FT710::get_attenuator()
-{
+/// RA0, attenuator 0 - 3
+int RIG_FT710::get_attenuator() {
 	cmd = rsp = "RA0";
 	cmd += ';';
 	wait_char(';', 5, 100, "get att", ASC);
 
 	gett("get_attenuator()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return progStatus.attenuator;
-	if (p + 3 >= replystr.length()) return progStatus.attenuator;
-	atten_state = replystr[p+3] - '0';
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return progStatus.attenuator;
+	}
+	if (pos + 3 >= replystr.length()) {
+		return progStatus.attenuator;
+	}
+	atten_state = replystr[pos + 3] - '0';
 	return atten_state;
 }
 
-int  RIG_FT710::next_preamp()
-{
+/// preamp cycles IPO, AMP 1, AMP 2
+int RIG_FT710::next_preamp() {
 	switch (preamp_state) {
-		case 0: return 1;
-		case 1: return 2;
-		case 2: return 0;
+		case 0:
+			return 1;
+		case 1:
+			return 2;
+		case 2:
+			return 0;
 	}
 	return 0;
 }
 
-void RIG_FT710::set_preamp(int val)
-{
-	preamp_state = val;
+/// PA0, preamp 0 - 2
+void RIG_FT710::set_preamp(int preamp) {
+	preamp_state = preamp;
 	cmd = "PA00;";
 	cmd[3] = '0' + preamp_state;
-	sendCommand (cmd);
+	sendCommand(cmd);
 	showresp(WARN, ASC, "SET preamp", cmd, replystr);
 }
 
-int RIG_FT710::get_preamp()
-{
+/// PA0, preamp 0 - 2
+int RIG_FT710::get_preamp() {
 	cmd = rsp = "PA0";
 	cmd += ';';
 	wait_char(';', 5, 100, "get pre", ASC);
 
 	gett("get_preamp()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p != std::string::npos)
-		preamp_state = replystr[p+3] - '0';
+	size_t pos = replystr.rfind(rsp);
+	if (pos != std::string::npos) {
+		preamp_state = replystr[pos + 3] - '0';
+	}
 	return preamp_state;
 }
 
-static bool narrow = 0; // 0 - wide, 1 - narrow
+// default bandwidth table: 0 - wide, 1 - narrow
+static bool narrow = 0;
 
 /// AM, FM and DATA-FM have no width setting; AM-N, FM-N and DATA-FM-N
 /// have one fixed width (manual Table 3, p.20)
-bool RIG_FT710::fixed_width(int mode)
-{
+bool RIG_FT710::fixed_width(int mode) {
 	return mode == mFM || mode == mAM || mode == mFM_N ||
 		mode == mDATA_FM || mode == mAM_N || mode == mDATA_FMN;
 }
 
-int RIG_FT710::adjust_bandwidth(int val)
-{
-	int bw = 0;
-	if (val == mCW_U || val == mCW_L) {
-		bandwidths_ = FT710_widths_CW;
-		bw_vals_ = FT710_wvals_CW;
-	} else if (fixed_width(val)) {
-		if (val == mFM) bandwidths_ = FT710_widths_FMwide;
-		else if (val ==  mAM) bandwidths_ = FT710_widths_AMwide;
-		else if (val == mAM_N) bandwidths_ = FT710_widths_AMnar;
-		else if (val == mFM_N) bandwidths_ = FT710_widths_FMnar;
-		else if (val == mDATA_FM) bandwidths_ = FT710_widths_DATA_FM;
-		else if (val == mDATA_FMN) bandwidths_ = FT710_widths_DATA_FMN;
-		bw_vals_ = FT710_wvals_AMFM;
-	} else if (val == mRTTY_L || val == mRTTY_U) { // RTTY
-		bandwidths_ = FT710_widths_RTTY;
-		bw_vals_ = FT710_wvals_RTTY;
-	} else if (val == mDATA_L || val == mDATA_U || val == mPSK) {
-		bandwidths_ = FT710_widths_DATA;
-		bw_vals_ = FT710_wvals_PSK;
+/// select the width table for mode and return its default width index
+int RIG_FT710::adjust_bandwidth(int mode) {
+	int bw_index = 0;
+	if (mode == mCW_U || mode == mCW_L) {
+		bandwidths_ = ft710_widths_cw;
+		bw_vals_ = FT710_WVALS_CW;
+	} else if (fixed_width(mode)) {
+		if (mode == mFM) {
+			bandwidths_ = ft710_widths_fm_wide;
+		} else if (mode == mAM) {
+			bandwidths_ = ft710_widths_am_wide;
+		} else if (mode == mAM_N) {
+			bandwidths_ = ft710_widths_am_nar;
+		} else if (mode == mFM_N) {
+			bandwidths_ = ft710_widths_fm_nar;
+		} else if (mode == mDATA_FM) {
+			bandwidths_ = ft710_widths_data_fm;
+		} else if (mode == mDATA_FMN) {
+			bandwidths_ = ft710_widths_data_fmn;
+		}
+		bw_vals_ = FT710_WVALS_AMFM;
+	} else if (mode == mRTTY_L || mode == mRTTY_U) {
+		bandwidths_ = ft710_widths_rtty;
+		bw_vals_ = FT710_WVALS_RTTY;
+	} else if (mode == mDATA_L || mode == mDATA_U || mode == mPSK) {
+		bandwidths_ = ft710_widths_data;
+		bw_vals_ = FT710_WVALS_PSK;
 	} else {
-		bandwidths_ = FT710_widths_SSB;
-		bw_vals_ = FT710_wvals_SSB;
+		bandwidths_ = ft710_widths_ssb;
+		bw_vals_ = FT710_WVALS_SSB;
 	}
 
-	if (narrow)
-		bw = defBW_narrow[val];
-	else
-		bw = defBW_wide[val];
+	if (narrow) {
+		bw_index = FT710_DEF_BW_NARROW[mode];
+	} else {
+		bw_index = FT710_DEF_BW_WIDE[mode];
+	}
 
-	return bw;
+	return bw_index;
 }
 
-int RIG_FT710::def_bandwidth(int m)
-{
-	int bw = adjust_bandwidth(m);
+/// width index last used in mode on the VFO in use, else the default
+int RIG_FT710::def_bandwidth(int mode) {
+	int bw_index = adjust_bandwidth(mode);
 	if (inuse == onB) {
-		if (mode_bwB[m] == -1)
-			mode_bwB[m] = bw;
-		return mode_bwB[m];
+		if (mode_bwB[mode] == -1) {
+			mode_bwB[mode] = bw_index;
+		}
+		return mode_bwB[mode];
 	}
-	if (mode_bwA[m] == -1)
-		mode_bwA[m] = bw;
-	return mode_bwA[m];
+	if (mode_bwA[mode] == -1) {
+		mode_bwA[mode] = bw_index;
+	}
+	return mode_bwA[mode];
 }
 
-std::vector<std::string>& RIG_FT710::bwtable(int n)
-{
-	switch (n) {
-		case mCW_U: case mCW_L:
-			return FT710_widths_CW;
-		case mFM: 
-			return FT710_widths_FMwide;
-		case mAM: 
-			return FT710_widths_AMwide;
-		case mAM_N : 
-			return FT710_widths_AMnar;
-		case mRTTY_L: case mRTTY_U: 
-			return FT710_widths_RTTY;
-		case mDATA_L: case mDATA_U: case mPSK:
-			return FT710_widths_DATA;
+/// width table for mode
+std::vector<std::string>& RIG_FT710::bwtable(int mode) {
+	switch (mode) {
+		case mCW_U:
+		case mCW_L:
+			return ft710_widths_cw;
+		case mFM:
+			return ft710_widths_fm_wide;
+		case mAM:
+			return ft710_widths_am_wide;
+		case mAM_N:
+			return ft710_widths_am_nar;
+		case mRTTY_L:
+		case mRTTY_U:
+			return ft710_widths_rtty;
+		case mDATA_L:
+		case mDATA_U:
+		case mPSK:
+			return ft710_widths_data;
 		case mFM_N:
-			return FT710_widths_FMnar;
+			return ft710_widths_fm_nar;
 		case mDATA_FMN:
-			return FT710_widths_DATA_FMN;
-		case mDATA_FM: 
-			return FT710_widths_DATA_FM;
-		default: ;
+			return ft710_widths_data_fmn;
+		case mDATA_FM:
+			return ft710_widths_data_fm;
+		default:
+			break;
 	}
-	return FT710_widths_SSB;
+	return ft710_widths_ssb;
 }
 
-void RIG_FT710::set_modeA(int val)
-{
-	modeA = val;
-	if (inuse == onB)
+/// MD, mode of VFO A
+void RIG_FT710::set_modeA(int mode) {
+	modeA = mode;
+	if (inuse == onB) {
 		cmd = rsp = "MD1";
-	else
+	} else {
 		cmd = rsp = "MD0";
-	cmd += FT710_mode_chr[val];
+	}
+	cmd += FT710_MODE_CHR[mode];
 	cmd += ';';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET mode A", cmd, replystr);
 	adjust_bandwidth(modeA);
 }
 
-int RIG_FT710::get_modeA()
-{
-	if (inuse == onB)
+/// MD, mode of VFO A
+int RIG_FT710::get_modeA() {
+	if (inuse == onB) {
 		cmd = rsp = "MD1";
-	else
+	} else {
 		cmd = rsp = "MD0";
+	}
 	cmd += ';';
 	wait_char(';', 5, 100, "get mode A", ASC);
 
 	gett("get_modeA()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p != std::string::npos) {
-		if (p + 3 < replystr.length()) {
-			int md = replystr[p+3];
-			int n = 0;
-			for (n = 0; n < NUM_MODES; n++)
-				if (md == FT710_mode_chr[n])
+	size_t pos = replystr.rfind(rsp);
+	if (pos != std::string::npos) {
+		if (pos + 3 < replystr.length()) {
+			int mode_chr = replystr[pos + 3];
+			int mode = 0;
+			for (mode = 0; mode < NUM_MODES; mode++) {
+				if (mode_chr == FT710_MODE_CHR[mode]) {
 					break;
-			if (n < NUM_MODES) {
-				modeA = n;
+				}
+			}
+			if (mode < NUM_MODES) {
+				modeA = mode;
 			}
 		}
 	}
@@ -1068,41 +1127,45 @@ int RIG_FT710::get_modeA()
 	return modeA;
 }
 
-void RIG_FT710::set_modeB(int val)
-{
-	modeB = val;
-	if (inuse == onA)
+/// MD, mode of VFO B
+void RIG_FT710::set_modeB(int mode) {
+	modeB = mode;
+	if (inuse == onA) {
 		cmd = rsp = "MD1";
-	else
+	} else {
 		cmd = rsp = "MD0";
-	cmd += FT710_mode_chr[val];
+	}
+	cmd += FT710_MODE_CHR[mode];
 	cmd += ';';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET mode B", cmd, replystr);
 	adjust_bandwidth(modeB);
 }
 
-int RIG_FT710::get_modeB()
-{
-	if (inuse == onA)
+/// MD, mode of VFO B
+int RIG_FT710::get_modeB() {
+	if (inuse == onA) {
 		cmd = rsp = "MD1";
-	else
+	} else {
 		cmd = rsp = "MD0";
+	}
 	cmd += ';';
 	wait_char(';', 5, 100, "get mode B", ASC);
 
 	gett("get_modeB()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p != std::string::npos) {
-		if (p + 3 < replystr.length()) {
-			int md = replystr[p+3];
-			int n = 0;
-			for (n = 0; n < NUM_MODES; n++)
-				if (md == FT710_mode_chr[n])
+	size_t pos = replystr.rfind(rsp);
+	if (pos != std::string::npos) {
+		if (pos + 3 < replystr.length()) {
+			int mode_chr = replystr[pos + 3];
+			int mode = 0;
+			for (mode = 0; mode < NUM_MODES; mode++) {
+				if (mode_chr == FT710_MODE_CHR[mode]) {
 					break;
-			if (n < NUM_MODES) {
-				modeB = n;
+				}
+			}
+			if (mode < NUM_MODES) {
+				modeB = mode;
 			}
 		}
 	}
@@ -1110,61 +1173,67 @@ int RIG_FT710::get_modeB()
 	return modeB;
 }
 
-void RIG_FT710::set_bwA(int val)
-{
-	int bw_indx = bw_vals_[val];
-	bwA = val;
+/// SH0, width of VFO A
+void RIG_FT710::set_bwA(int bw_index) {
+	int bw_code = bw_vals_[bw_index];
+	bwA = bw_index;
 
 	if (fixed_width(modeA)) {
 		return;
 	}
 	cmd.clear();
 	cmd.append("SH00");
-	cmd += '0' + bw_indx / 10;
-	cmd += '0' + bw_indx % 10;
+	cmd += '0' + bw_code / 10;
+	cmd += '0' + bw_code % 10;
 	cmd += ';';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET bw A", cmd, replystr);
 	sett("SET bwA");
-	mode_bwA[modeA] = val;
+	mode_bwA[modeA] = bw_index;
 }
 
-int RIG_FT710::get_bwA()
-{
+/// SH0, width of VFO A
+int RIG_FT710::get_bwA() {
 	if (fixed_width(modeA)) {
 		bwA = 0;
 		mode_bwA[modeA] = bwA;
-		return bwA;	
-	} 
+		return bwA;
+	}
 	cmd = rsp = "SH0";
 	cmd += ';';
 	wait_char(';', 7, 100, "get bw A", ASC);
 
 	gett("get_bwA()");
 
-	size_t p = last_frame("SH0", 7);
-	if (p == std::string::npos) return bwA;
-
-	replystr[p+6] = 0;
-	int bw_idx = fm_decimal(replystr.substr(p+4), 2);
-
-	const int *idx = bw_vals_;
-	int i = 0;
-	while (*idx != WVALS_LIMIT) {
-		if (*idx == bw_idx) break;
-		idx++;
-		i++;
+	size_t pos = last_frame("SH0", 7);
+	if (pos == std::string::npos) {
+		return bwA;
 	}
-	if (*idx == WVALS_LIMIT) i = 0;
-	bwA = i;
+
+	replystr[pos + 6] = 0;
+	int bw_code = fm_decimal(replystr.substr(pos + 4), 2);
+
+	const int *wval = bw_vals_;
+	int bw_index = 0;
+	while (*wval != WVALS_LIMIT) {
+		if (*wval == bw_code) {
+			break;
+		}
+		wval++;
+		bw_index++;
+	}
+	if (*wval == WVALS_LIMIT) {
+		bw_index = 0;
+	}
+	bwA = bw_index;
 	mode_bwA[modeA] = bwA;
 	return bwA;
 }
 
-void RIG_FT710::set_bwB(int val)
-{
-	int bw_indx = bw_vals_[val];
-	bwB = val;
+/// SH0, width of VFO B
+void RIG_FT710::set_bwB(int bw_index) {
+	int bw_code = bw_vals_[bw_index];
+	bwB = bw_index;
 
 	if (fixed_width(modeB)) {
 		mode_bwB[modeB] = 0;
@@ -1172,8 +1241,8 @@ void RIG_FT710::set_bwB(int val)
 	}
 	cmd.clear();
 	cmd.append("SH00");
-	cmd += '0' + bw_indx / 10;
-	cmd += '0' + bw_indx % 10;
+	cmd += '0' + bw_code / 10;
+	cmd += '0' + bw_code % 10;
 	cmd += ';';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET bw B", cmd, replystr);
@@ -1181,282 +1250,309 @@ void RIG_FT710::set_bwB(int val)
 	mode_bwB[modeB] = bwB;
 }
 
-int RIG_FT710::get_bwB()
-{
+/// SH0, width of VFO B
+int RIG_FT710::get_bwB() {
 	if (fixed_width(modeB)) {
 		bwB = 0;
 		mode_bwB[modeB] = bwB;
 		return bwB;
-	} 
+	}
 	cmd = rsp = "SH0";
 	cmd += ';';
 	wait_char(';', 7, 100, "get bw B", ASC);
 
 	gett("get_bwB()");
 
-	size_t p = last_frame("SH0", 7);
-	if (p == std::string::npos) return bwB;
-
-	replystr[p+6] = 0;
-	int bw_idx = fm_decimal(replystr.substr(p+4),2);
-
-	const int *idx = bw_vals_;
-	int i = 0;
-	while (*idx != WVALS_LIMIT) {
-		if (*idx == bw_idx) break;
-		idx++;
-		i++;
+	size_t pos = last_frame("SH0", 7);
+	if (pos == std::string::npos) {
+		return bwB;
 	}
-	if (*idx == WVALS_LIMIT) i = 0;
-	bwB = i;
+
+	replystr[pos + 6] = 0;
+	int bw_code = fm_decimal(replystr.substr(pos + 4), 2);
+
+	const int *wval = bw_vals_;
+	int bw_index = 0;
+	while (*wval != WVALS_LIMIT) {
+		if (*wval == bw_code) {
+			break;
+		}
+		wval++;
+		bw_index++;
+	}
+	if (*wval == WVALS_LIMIT) {
+		bw_index = 0;
+	}
+	bwB = bw_index;
 	mode_bwB[modeB] = bwB;
 	return bwB;
 }
 
-std::string RIG_FT710::get_BANDWIDTHS()
-{
-	std::stringstream s;
-	for (int i = 0; i < NUM_MODES; i++)
-		s << mode_bwA[i] << " ";
-	for (int i = 0; i < NUM_MODES; i++)
-		s << mode_bwB[i] << " ";
-	return s.str();
+/// width index last used in each mode, VFO A then VFO B
+std::string RIG_FT710::get_BANDWIDTHS() {
+	std::stringstream widths;
+	for (int i = 0; i < NUM_MODES; i++) {
+		widths << mode_bwA[i] << " ";
+	}
+	for (int i = 0; i < NUM_MODES; i++) {
+		widths << mode_bwB[i] << " ";
+	}
+	return widths.str();
 }
 
-void RIG_FT710::set_BANDWIDTHS(std::string s)
-{
-	std::stringstream strm;
-	strm << s;
-	for (int i = 0; i < NUM_MODES; i++)
-		strm >> mode_bwA[i];
-	for (int i = 0; i < NUM_MODES; i++)
-		strm >> mode_bwB[i];
+/// width index last used in each mode, VFO A then VFO B
+void RIG_FT710::set_BANDWIDTHS(std::string widths) {
+	std::stringstream stream;
+	stream << widths;
+	for (int i = 0; i < NUM_MODES; i++) {
+		stream >> mode_bwA[i];
+	}
+	for (int i = 0; i < NUM_MODES; i++) {
+		stream >> mode_bwB[i];
+	}
 }
 
-int RIG_FT710::get_modetype(int n)
-{
-	return FT710_mode_type[n];
+/// 'L' for lower sideband modes, otherwise 'U'
+int RIG_FT710::get_modetype(int mode) {
+	return FT710_MODE_TYPE[mode];
 }
 
-void RIG_FT710::set_if_shift(int val)
-{
 /// IS P1 is fixed at 0 (manual p.14); there is one IF shift for A and B
+void RIG_FT710::set_if_shift(int shift) {
 	cmd = "IS00+0000;";
-	if (val != 0) progStatus.shift = true;
-	else progStatus.shift = false;
-	if (val < 0) cmd[4] = '-';
-	val = abs(val);
+	if (shift != 0) {
+		progStatus.shift = true;
+	} else {
+		progStatus.shift = false;
+	}
+	if (shift < 0) {
+		cmd[4] = '-';
+	}
+	shift = abs(shift);
 	for (int i = 8; i > 4; i--) {
-		cmd[i] += val % 10;
-		val /= 10;
+		cmd[i] += shift % 10;
+		shift /= 10;
 	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET if shift", cmd, replystr);
 }
 
-bool RIG_FT710::get_if_shift(int &val)
-{
+/// IS0, IF shift in Hz; true if not 0
+bool RIG_FT710::get_if_shift(int &shift) {
 	cmd = rsp = "IS0";
 	cmd += ';';
 	wait_char(';', 10, 100, "get if shift", ASC);
 
 	gett("get_if_shift()");
 
-	size_t p = replystr.rfind(rsp);
-	val = progStatus.shift_val;
-	if (p == std::string::npos) return progStatus.shift;
-	val = atoi(&replystr[p+5]);
-	if (replystr[p+4] == '-') val = -val;
-	return (val != 0);
+	size_t pos = replystr.rfind(rsp);
+	shift = progStatus.shift_val;
+	if (pos == std::string::npos) {
+		return progStatus.shift;
+	}
+	shift = atoi(&replystr[pos + 5]);
+	if (replystr[pos + 4] == '-') {
+		shift = -shift;
+	}
+	return (shift != 0);
 }
 
-void RIG_FT710::get_if_min_max_step(int &min, int &max, int &step)
-{
+/// IF shift range -1200 to 1200 Hz in 20 Hz steps
+void RIG_FT710::get_if_min_max_step(int &min, int &max, int &step) {
 	if_shift_min = min = -1200;
 	if_shift_max = max = 1200;
 	if_shift_step = step = 20;
 	if_shift_mid = 0;
 }
 
-/*
-BPabcde;
-a: Fixed, '0'
-
-b: Manual NOTCH ON/OFF, 1/0
-
-cde: 001 - 320, (NOTCH Frequency : x 10 Hz )
-*/
-static std::string notch_str_on  = "BP00001;";
-static std::string notch_str_off = "BP00000;";
+// BP P1 P2 P3P3P3 ;
+//   P1: '0' manual notch on/off, '1' notch frequency
+//   P2: fixed '0'
+//   P3: on/off 000/001, or frequency 001 - 320 (x 10 Hz)
+static const std::string NOTCH_STR_ON  = "BP00001;";
+static const std::string NOTCH_STR_OFF = "BP00000;";
 static std::string notch_str_val = "BP01000;";
 static int notch_val = 1500;
 
-void RIG_FT710::set_notch(bool on, int val)
-{
-	if (notch_val != val) {
-		cmd = notch_str_on;
+/// BP, manual notch on/off and frequency in Hz
+void RIG_FT710::set_notch(bool notch_on, int frequency) {
+	if (notch_val != frequency) {
+// set notch ON
+		cmd = NOTCH_STR_ON;
 		sendCommand(cmd);
 		showresp(WARN, ASC, "SET notch ON", cmd, replystr);
-		set_trace(3,"set_notch ON", cmd.c_str(), replystr.c_str());
+		set_trace(3, "set_notch ON", cmd.c_str(), replystr.c_str());
 // set notch frequency
-		notch_val = val;
-		val /= 10;
+		notch_val = frequency;
+		frequency /= 10;
 		for (int i = 0; i < 3; i++) {
-			notch_str_val[6 - i] = '0' + (val % 10);
-			val /= 10;
+			notch_str_val[6 - i] = '0' + (frequency % 10);
+			frequency /= 10;
 		}
 		cmd = notch_str_val;
-// set notch ON
 		sendCommand(cmd);
 		showresp(WARN, ASC, "SET notch val", cmd, replystr);
-		set_trace(3,"set_notch val", cmd.c_str(), replystr.c_str());
+		set_trace(3, "set_notch val", cmd.c_str(), replystr.c_str());
 	}
-	if (on)
-		cmd = notch_str_on;
-	else
-		cmd = notch_str_off;
+	if (notch_on) {
+		cmd = NOTCH_STR_ON;
+	} else {
+		cmd = NOTCH_STR_OFF;
+	}
 	sendCommand(cmd);
-	set_trace(3,"set_notch OFF", cmd.c_str(), replystr.c_str());
+	set_trace(3, "set_notch OFF", cmd.c_str(), replystr.c_str());
 	showresp(WARN, ASC, "SET notch OFF", cmd, replystr);
-
 }
 
-bool  RIG_FT710::get_notch(int &val)
-{
-	bool ison = false;
+/// BP00 and BP01, manual notch on/off and frequency in Hz
+bool RIG_FT710::get_notch(int &frequency) {
+	bool notch_is_on = false;
 
 	cmd = "BP00;";
 	rsp = "BP";
 	wait_char(';', 8, 100, "get notch on/off", ASC);
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return ison;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return notch_is_on;
+	}
 
 	gett("get_notch()");
 
-	if (replystr[p+6] == '1') // manual notch enabled
-		ison = true;
+// manual notch enabled
+	if (replystr[pos + 6] == '1') {
+		notch_is_on = true;
+	}
 
-	val = progStatus.notch_val;
+	frequency = progStatus.notch_val;
 	cmd = "BP01;";
 	rsp = "BP";
 	wait_char(';', 8, 100, "get notch val", ASC);
 
 	gett("get_notch_val()");
 
-	p = replystr.rfind(rsp);
-	if (p == std::string::npos)
-		val = 10;
-	else
-		val = fm_decimal(replystr.substr(p+4), 3) * 10;
+	pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		frequency = 10;
+	} else {
+		frequency = fm_decimal(replystr.substr(pos + 4), 3) * 10;
+	}
 
-	return (notch_on = ison);
+	return (m_notch_on = notch_is_on);
 }
 
-void RIG_FT710::get_notch_min_max_step(int &min, int &max, int &step)
-{
+/// manual notch range 10 to 3200 Hz in 10 Hz steps
+void RIG_FT710::get_notch_min_max_step(int &min, int &max, int &step) {
 	min = 10;
 	max = 3200;
 	step = 10;
 }
 
-void RIG_FT710::set_auto_notch(int v)
-{
 /// BC P1 is fixed at 0 (manual p.7); the radio answers ?; to BC1
+void RIG_FT710::set_auto_notch(int notch_on) {
 	cmd = "BC00;";
-	if (v) cmd[3] = '1';
+	if (notch_on) {
+		cmd[3] = '1';
+	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET auto notch", cmd, replystr);
 }
 
-int  RIG_FT710::get_auto_notch()
-{
+/// BC0, auto notch on/off
+int RIG_FT710::get_auto_notch() {
 	cmd = "BC0;";
 	wait_char(';', 5, 100, "get auto notch", ASC);
 
 	gett("get_auto_notch()");
 
-	size_t p = replystr.rfind("BC");
-	if (p == std::string::npos) return 0;
-	if (replystr[p+3] == '1') return 1;
+	size_t pos = replystr.rfind("BC");
+	if (pos == std::string::npos) {
+		return 0;
+	}
+	if (replystr[pos + 3] == '1') {
+		return 1;
+	}
 	return 0;
 }
 
-void RIG_FT710::set_noise(bool b)
-{
 /// NB P1 is fixed at 0 (manual p.17); there is one NB for A and B
+void RIG_FT710::set_noise(bool nb_on) {
 	cmd = "NB00;";
 
-	nb_state = b;
+	nb_state = nb_on;
 
-	if (b) {
+	if (nb_on) {
 		cmd[3] = '1';
 		noise_blanker_label(nb_label(), true);
-	} else
+	} else {
 		noise_blanker_label(nb_label(), false);
+	}
 
-	sendCommand (cmd);
+	sendCommand(cmd);
 	showresp(WARN, ASC, "SET NB", cmd, replystr);
 }
 
-int RIG_FT710::get_noise()
-{
+/// NB0, noise blanker on/off
+int RIG_FT710::get_noise() {
 	cmd = rsp = "NB0";
 	cmd += ';';
 	wait_char(';', 5, 100, "get NB", ASC);
 
 	gett("get_noise()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return nb_state;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return nb_state;
+	}
 
-	nb_state = replystr[p+3] - '0';
+	nb_state = replystr[pos + 3] - '0';
 
 	if (nb_state) {
 		noise_blanker_label("NB on", true);
-	} else
+	} else {
 		noise_blanker_label("NB", false);
+	}
 
 	return nb_state;
 }
 
-// val 0 .. 100
-void RIG_FT710::set_mic_gain(int val)
-{
+/// MG, mic gain 0 - 100
+void RIG_FT710::set_mic_gain(int gain) {
 	cmd = "MG000;";
 	for (int i = 3; i > 0; i--) {
-		cmd[1+i] += val % 10;
-		val /= 10;
+		cmd[1 + i] += gain % 10;
+		gain /= 10;
 	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET mic", cmd, replystr);
 }
 
-int RIG_FT710::get_mic_gain()
-{
+/// MG, mic gain 0 - 100
+int RIG_FT710::get_mic_gain() {
 	cmd = rsp = "MG";
 	cmd += ';';
 	wait_char(';', 6, 100, "get mic", ASC);
 
 	gett("get_mic_gain()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return progStatus.mic_gain;
-	int val = atoi(&replystr[p+2]);
-	return val;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return progStatus.mic_gain;
+	}
+	int gain = atoi(&replystr[pos + 2]);
+	return gain;
 }
 
-void RIG_FT710::get_mic_min_max_step(int &min, int &max, int &step)
-{
+/// mic gain range 0 - 100
+void RIG_FT710::get_mic_min_max_step(int &min, int &max, int &step) {
 	min = 0;
 	max = 100;
 	step = 1;
 }
 
-void RIG_FT710::set_rf_gain(int val)
-{
+/// RG0, RF gain 0 - 100; RF GAIN is 000-255 (manual p.19)
+void RIG_FT710::set_rf_gain(int gain) {
 	cmd = "RG0000;";
-/// RF GAIN is 000-255 (manual p.19)
-	int rfval = (int)round(val * 255 / 100.0);
+	int rfval = (int)round(gain * 255 / 100.0);
 	for (int i = 5; i > 2; i--) {
 		cmd[i] = rfval % 10 + '0';
 		rfval /= 10;
@@ -1480,8 +1576,8 @@ void RIG_FT710::set_rf_gain(int val)
 	}
 }
 
-int  RIG_FT710::get_rf_gain()
-{
+/// RG0, RF gain 0 - 100
+int RIG_FT710::get_rf_gain() {
 	int rfval = 0;
 	cmd = rsp = "RG0";
 	cmd += ';';
@@ -1489,34 +1585,40 @@ int  RIG_FT710::get_rf_gain()
 
 	gett("get_rf_gain()");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return progStatus.rfgain;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return progStatus.rfgain;
+	}
 	for (int i = 3; i < 6; i++) {
 		rfval *= 10;
-		rfval += replystr[p+i] - '0';
+		rfval += replystr[pos + i] - '0';
 	}
 	rfval = (int)round(rfval * 100 / 255.0);
-	if (rfval > 100) rfval = 100;
+	if (rfval > 100) {
+		rfval = 100;
+	}
 	return rfval;
 }
 
-void RIG_FT710::get_rf_min_max_step(int &min, int &max, int &step)
-{
+/// RF gain range 0 - 100
+void RIG_FT710::get_rf_min_max_step(int &min, int &max, int &step) {
 	min = 0;
 	max = 100;
 	step = 1;
 }
 
-void RIG_FT710::set_vox_onoff()
-{
+/// VX, VOX on/off
+void RIG_FT710::set_vox_onoff() {
 	cmd = "VX0;";
-	if (progStatus.vox_onoff) cmd[2] = '1';
+	if (progStatus.vox_onoff) {
+		cmd[2] = '1';
+	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET vox", cmd, replystr);
 }
 
-void RIG_FT710::set_vox_gain()
-{
+/// VG, VOX gain
+void RIG_FT710::set_vox_gain() {
 	cmd = "VG";
 	cmd.append(to_decimal(progStatus.vox_gain, 3)).append(";");
 	sendCommand(cmd);
@@ -1524,8 +1626,7 @@ void RIG_FT710::set_vox_gain()
 }
 
 /// ANTI VOX LEVEL, AV 001-100 (manual p.7)
-void RIG_FT710::set_vox_anti()
-{
+void RIG_FT710::set_vox_anti() {
 	int level = progStatus.vox_anti;
 	if (level < 1) {
 		level = 1;
@@ -1538,86 +1639,94 @@ void RIG_FT710::set_vox_anti()
 	showresp(WARN, ASC, "SET anti-vox", cmd, replystr);
 }
 
-void RIG_FT710::set_vox_hang()
-{
+/// VD, VOX delay
+void RIG_FT710::set_vox_hang() {
 	cmd = "VD";
 	cmd.append(to_decimal(progStatus.vox_hang, 4)).append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET vox delay", cmd, replystr);
 }
 
-void RIG_FT710::set_vox_on_dataport()
-{
+/// EX030405, VOX on the data port
+void RIG_FT710::set_vox_on_dataport() {
 	cmd = "EX0304050;";
-	if (progStatus.vox_on_dataport) cmd[8] = '1';
+	if (progStatus.vox_on_dataport) {
+		cmd[8] = '1';
+	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET vox on data port", cmd, replystr);
 }
 
-void RIG_FT710::set_cw_wpm()
-{
+/// KS, keyer speed 4 - 60 wpm
+void RIG_FT710::set_cw_wpm() {
 	cmd = "KS";
-	if (progStatus.cw_wpm > 60) progStatus.cw_wpm = 60;
-	if (progStatus.cw_wpm < 4) progStatus.cw_wpm = 4;
+	if (progStatus.cw_wpm > 60) {
+		progStatus.cw_wpm = 60;
+	}
+	if (progStatus.cw_wpm < 4) {
+		progStatus.cw_wpm = 4;
+	}
 	cmd.append(to_decimal(progStatus.cw_wpm, 3)).append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET cw wpm", cmd, replystr);
 }
 
-
-void RIG_FT710::enable_keyer()
-{
+/// KR, keyer on/off
+void RIG_FT710::enable_keyer() {
 	cmd = "KR0;";
-	if (progStatus.enable_keyer) cmd[2] = '1';
+	if (progStatus.enable_keyer) {
+		cmd[2] = '1';
+	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET keyer on/off", cmd, replystr);
 }
 
-bool RIG_FT710::set_cw_spot()
-{
+/// CS, CW spot on/off; only sent in CW-U or CW-L
+bool RIG_FT710::set_cw_spot() {
 	if (vfo->imode == 2 || vfo->imode == 6) {
 		cmd = "CS0;";
-		if (progStatus.spot_onoff) cmd[2] = '1';
+		if (progStatus.spot_onoff) {
+			cmd[2] = '1';
+		}
 		sendCommand(cmd);
 		showresp(WARN, ASC, "SET spot on/off", cmd, replystr);
 		return true;
-	} else
+	} else {
 		return false;
+	}
 }
 
-void RIG_FT710::set_cw_weight()
-{
 /// CW WEIGHT is EX020203 (manual p.11).  The manual gives P4 as 25-45,
 /// but an FT-710 answers ?; to 25 and takes 00-20 for 2.5-4.5.
-	int n = round((progStatus.cw_weight - 2.5) * 10);
-	if (n < 0) {
-		n = 0;
+void RIG_FT710::set_cw_weight() {
+	int weight = round((progStatus.cw_weight - 2.5) * 10);
+	if (weight < 0) {
+		weight = 0;
 	}
-	if (n > 20) {
-		n = 20;
+	if (weight > 20) {
+		weight = 20;
 	}
-	cmd.assign("EX020203").append(to_decimal(n, 2)).append(";");
+	cmd.assign("EX020203").append(to_decimal(weight, 2)).append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET cw weight", cmd, replystr);
 }
 
-void RIG_FT710::set_cw_qsk()
-{
 /// QSK DELAY TIME is EX020119 (manual p.11): 0-3 for 15-30 msec
-	int n = progStatus.cw_qsk / 5 - 3;
-	if (n < 0) {
-		n = 0;
+void RIG_FT710::set_cw_qsk() {
+	int delay = progStatus.cw_qsk / 5 - 3;
+	if (delay < 0) {
+		delay = 0;
 	}
-	if (n > 3) {
-		n = 3;
+	if (delay > 3) {
+		delay = 3;
 	}
-	cmd.assign("EX020119").append(to_decimal(n, 1)).append(";");
+	cmd.assign("EX020119").append(to_decimal(delay, 1)).append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET cw qsk", cmd, replystr);
 }
 
-void RIG_FT710::set_break_in()
-{
+/// BI, break-in on/off
+void RIG_FT710::set_break_in() {
 	if (progStatus.break_in) {
 		cmd = "BI1;";
 		break_in_label("BK-IN");
@@ -1630,9 +1739,9 @@ void RIG_FT710::set_break_in()
 	sett("set_break_in");
 }
 
-int RIG_FT710::get_break_in()
-{
-/// the FT-710 answers BI only in CW; in other modes it answers ?;
+/// BI, break-in on/off.  The FT-710 answers BI only in CW; in other
+/// modes it answers ?;
+int RIG_FT710::get_break_in() {
 	int mode = (inuse == onB) ? modeB : modeA;
 	if (mode != mCW_U && mode != mCW_L) {
 		return progStatus.break_in;
@@ -1649,89 +1758,84 @@ int RIG_FT710::get_break_in()
 		progStatus.cw_delay = 0;
 	} else {
 		break_in_label("QSK ?");
-//		get_qsk_delay();
 	}
 	return progStatus.break_in;
 }
 
-// DNR
-void RIG_FT710::set_noise_reduction_val(int val)
-{
-	cmd.assign("RL0").append(to_decimal(val, 2)).append(";");
+/// RL0, DNR level
+void RIG_FT710::set_noise_reduction_val(int level) {
+	cmd.assign("RL0").append(to_decimal(level, 2)).append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET_noise_reduction_val", cmd, replystr);
 	sett("set_noise_reduction_val");
 }
 
-int  RIG_FT710::get_noise_reduction_val()
-{
-	int val = 1;
+/// RL0, DNR level
+int RIG_FT710::get_noise_reduction_val() {
+	int level = 1;
 	cmd = rsp = "RL0";
 	cmd.append(";");
-	wait_char(';',6, 100, "GET noise reduction val", ASC);
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return val;
-	val = atoi(&replystr[p+3]);
-	return val;
+	wait_char(';', 6, 100, "GET noise reduction val", ASC);
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return level;
+	}
+	level = atoi(&replystr[pos + 3]);
+	return level;
 }
 
-// DNR
-void RIG_FT710::set_noise_reduction(int val)
-{
-	cmd.assign("NR0").append(val ? "1" : "0" ).append(";");
+/// NR0, DNR on/off
+void RIG_FT710::set_noise_reduction(int nr_on) {
+	cmd.assign("NR0").append(nr_on ? "1" : "0").append(";");
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET noise reduction", cmd, replystr);
 	sett("set_noise_reduction_on/off");
 }
 
-int  RIG_FT710::get_noise_reduction()
-{
-	int val;
+/// NR0, DNR on/off
+int RIG_FT710::get_noise_reduction() {
 	cmd = rsp = "NR0";
 	cmd.append(";");
-	wait_char(';',5, 100, "GET noise reduction", ASC);
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return 0;
-	val = replystr[p+3] - '0';
-	return val;
+	wait_char(';', 5, 100, "GET noise reduction", ASC);
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return 0;
+	}
+	int nr_on = replystr[pos + 3] - '0';
+	return nr_on;
 }
 
-// ---------------------------------------------------------------------
-// set date and time
-// ---------------------------------------------------------------------
-// dt formated as YYYYMMDD
-// ---------------------------------------------------------------------
-void RIG_FT710::sync_date(char *dt)
-{
+/// DT0, set the date; date_str is formatted as YYYYMMDD
+void RIG_FT710::sync_date(char *date_str) {
 	cmd.assign("DT0");
-	cmd.append(dt);
+	cmd.append(date_str);
 	cmd += ';';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "sync_date", cmd, replystr);
 	sett("sync_date");
 }
 
-// ---------------------------------------------------------------------
-// tm formated as HH:MM:SS
-// ---------------------------------------------------------------------
-void RIG_FT710::sync_clock(char *tm)
-{
+/// DT1, set the time; time_str is formatted as HH:MM:SS
+void RIG_FT710::sync_clock(char *time_str) {
 	cmd.assign("DT1");
-	cmd += tm[0]; cmd += tm[1];
-	cmd += tm[3]; cmd += tm[4];
-	cmd += tm[6]; cmd += tm[7];
+	cmd += time_str[0];
+	cmd += time_str[1];
+	cmd += time_str[3];
+	cmd += time_str[4];
+	cmd += time_str[6];
+	cmd += time_str[7];
 	cmd += ';';
 	sendCommand(cmd);
 	showresp(WARN, ASC, "sync_time", cmd, replystr);
 	sett("sync_time");
 }
 
-void RIG_FT710::set_squelch(int val)
-{
+/// SQ0, squelch 0 - 100
+void RIG_FT710::set_squelch(int level) {
 	cmd = "SQ0000;";
 	for (int i = 5; i > 2; i--) {
-		cmd[i] = val % 10 + '0';
-		val /= 10;
+		cmd[i] = level % 10 + '0';
+		level /= 10;
 	}
 
 	set_trace(1, "set_squelch()");
@@ -1740,21 +1844,22 @@ void RIG_FT710::set_squelch(int val)
 	showresp(WARN, ASC, "SET squelch", cmd, replystr);
 }
 
-int  RIG_FT710::get_squelch()
-{
+/// SQ0, squelch 0 - 100
+int RIG_FT710::get_squelch() {
 	int sqval = 0;
 	cmd = rsp = "SQ0";
 	cmd += ';';
 	get_trace(1, "get_squelch()");
-	wait_char(';',7, 100, "get squelch", ASC);
+	wait_char(';', 7, 100, "get squelch", ASC);
 	gett("");
 
-	size_t p = replystr.rfind(rsp);
-	if (p == std::string::npos) return progStatus.squelch;
+	size_t pos = replystr.rfind(rsp);
+	if (pos == std::string::npos) {
+		return progStatus.squelch;
+	}
 	for (int i = 3; i < 6; i++) {
 		sqval *= 10;
-		sqval += replystr[p+i] - '0';
+		sqval += replystr[pos + i] - '0';
 	}
 	return ceil(sqval);
 }
-
