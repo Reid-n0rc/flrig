@@ -1945,16 +1945,23 @@ void RIG_FTX_1::get_compression(int &on, int &val)
 }
 
 
+// Band buttons 1 - 13 (1.8 ... 50, 144, 430, Gen) to BS band codes
+//   00 1.8  01 3.5  02 5  03 7  04 10  05 14  06 18  07 21  08 24.5
+//   09 28  10 50  11 70/GEN  13 144  14 430
 void RIG_FTX_1::get_band_selection(int v)
 {
-	if (v < 3) v = v - 1;
+	static const char *BAND_CODES[] = {
+		"00", "01", "03", "04", "05", "06", "07", "08", "09", "10",
+		"13", "14", "11" };
+	if (v < 1 || v > 13) {
+		return;
+	}
 	cmd.assign("BS").append(1, active_side());
-	cmd.append(to_decimal(v, 2)).append(";");
-	get_trace(1, __func__);
+	cmd.append(BAND_CODES[v - 1]).append(";");
+	set_trace(1, __func__);
 	sendCommand(cmd);
-	gett("");
+	sett("");
 	showresp(WARN, ASC, __func__, cmd, replystr);
-	get_trace(2, "get band", cmd.c_str());
 }
 
 // EX030113 REF FREQ ADJ -25 - +25, always signed: +05, -12
