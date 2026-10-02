@@ -603,6 +603,11 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_notch");
+		xmlrpc_pending = false;
 
 		static int ntch;
 		ntch = (int)(params[0]);
@@ -611,10 +616,6 @@ public:
 			progStatus.notch = true;
 		else
 			progStatus.notch = false;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_notch");
-		xmlrpc_pending = false;
 
 		selrig->set_notch(progStatus.notch, progStatus.notch_val);
 		xml_trace(1, "rig_set_notch");
@@ -636,6 +637,11 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_notch");
+		xmlrpc_pending = false;
 
 		static int ntch;
 		ntch = (int)(params[0]);
@@ -644,10 +650,6 @@ public:
 			progStatus.notch = true;
 		else
 			progStatus.notch = false;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_notch");
-		xmlrpc_pending = false;
 
 		selrig->set_notch(progStatus.notch, progStatus.notch_val);
 		xml_trace(1, "rig_set_verify_notch");
@@ -701,14 +703,15 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_rfgain");
+		xmlrpc_pending = false;
 
 		static int rfg;
 		rfg = static_cast<int>((double)((params[0])));
 		progStatus.rfgain = rfg;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_rfgain");
-		xmlrpc_pending = false;
 
 		selrig->set_rf_gain(progStatus.rfgain);
 		xml_trace(1, "rig_set_rfgain");
@@ -730,14 +733,15 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set _verify_rfgain");
+		xmlrpc_pending = false;
 
 		static int rfg;
 		rfg = static_cast<int>((double)((params[0])));
 		progStatus.rfgain = rfg;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set _verify_rfgain");
-		xmlrpc_pending = false;
 
 		selrig->set_rf_gain(progStatus.rfgain);
 
@@ -762,6 +766,11 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_mod_rfgain");
+		xmlrpc_pending = false;
 
 		int min, max, step;
 		selrig->get_rf_min_max_step(min, max, step);
@@ -770,10 +779,6 @@ public:
 		progStatus.rfgain += change;
 		if (progStatus.rfgain > max) progStatus.rfgain = max;
 		if (progStatus.rfgain < min) progStatus.rfgain = min;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_mod_rfgain");
-		xmlrpc_pending = false;
 
 		selrig->set_rf_gain(progStatus.rfgain);
 		xml_trace(1, "rig_mod_rfgain");
@@ -827,14 +832,15 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_micgain");
+		xmlrpc_pending = false;
 
 		static int micg;
 		micg = (int)(params[0]);
 		progStatus.mic_gain = micg;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_micgain");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_set_micgain");
 		selrig->set_mic_gain(progStatus.mic_gain);
@@ -856,14 +862,15 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_micgain");
+		xmlrpc_pending = false;
 
 		static int micg;
 		micg = (int)(params[0]);
 		progStatus.mic_gain = micg;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_micgain");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_set_verify_micgain");
 		selrig->set_mic_gain(progStatus.mic_gain);
@@ -920,14 +927,15 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_volume");
+		xmlrpc_pending = false;
 
 		static int volume;
 		volume = (int)(params[0]);
 		progStatus.volume = volume;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_volume");
-		xmlrpc_pending = false;
 
 		selrig->set_volume_control(progStatus.volume);
 		xml_trace(1, "rig_set_volume");
@@ -949,14 +957,15 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_volume");
+		xmlrpc_pending = false;
 
 		static int volume;
 		volume = (int)(params[0]);
 		progStatus.volume = volume;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_volume");
-		xmlrpc_pending = false;
 
 		selrig->set_volume_control(progStatus.volume);
 
@@ -981,6 +990,11 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		xmlrpc_pending = true;
+		guard_lock serial_lock(&mutex_serial, "xml rig_mod_volume");
+		xmlrpc_pending = false;
 		int min, max, step;
 		selrig->get_vol_min_max_step(min, max, step);
 
@@ -988,10 +1002,6 @@ public:
 		progStatus.volume += change;
 		if (progStatus.volume > max) progStatus.volume = max;
 		if (progStatus.volume < min) progStatus.volume = min;
-
-		xmlrpc_pending = true;
-		guard_lock serial_lock(&mutex_serial, "xml rig_mod_volume");
-		xmlrpc_pending = false;
 
 		selrig->set_volume_control(progStatus.volume);
 		xml_trace(1, "rig_mod_volume");
