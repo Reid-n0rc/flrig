@@ -1463,6 +1463,21 @@ void RIG_FT710::set_rf_gain(int val)
 	}
 	sendCommand(cmd);
 	showresp(WARN, ASC, "SET rfgain", cmd, replystr);
+
+/// An FT-710 now and then answers ?; to a valid RG set during flrig's
+/// polling (2 of 99 sets in testing) and keeps the old value, so read
+/// the setting back and send it once more if it differs.
+	std::string sent = cmd;
+	cmd = "RG0;";
+	wait_char(';', 7, 100, "check rfgain", ASC);
+	size_t pos = last_frame("RG0", 7);
+	if (pos == std::string::npos || replystr.substr(pos, 7) != sent) {
+		LOG_WARN("%s not taken, read back \"%s\", sending again",
+			sent.c_str(), replystr.c_str());
+		cmd = sent;
+		sendCommand(cmd);
+		showresp(WARN, ASC, "SET rfgain again", cmd, replystr);
+	}
 }
 
 int  RIG_FT710::get_rf_gain()
