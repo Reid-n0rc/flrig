@@ -811,7 +811,8 @@ void TRACED(init_Generic_Tabs)
 			tab_FT8n_CTCSS->redraw();
 			tab_FT8n_bands->show();
 			tab_FT8n_CTCSS->show();
-		} else if (selrig->name_ == rig_FT991A.name_) {
+		} else if (selrig->name_ == rig_FT991A.name_ ||
+			selrig->name_ == rig_FTX_1.name_) {
 			tabsGeneric->add(tab_ft991_bands);
 			tab_ft991_bands->redraw();
 			tab_ft991_bands->show();

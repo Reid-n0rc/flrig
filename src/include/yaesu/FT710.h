@@ -18,149 +18,182 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // ----------------------------------------------------------------------------
 
-#ifndef _FT710_H
-#define _FT710_H
+#ifndef YAESU_FT710_H_INCLUDED
+#define YAESU_FT710_H_INCLUDED
 
 #include "rigbase.h"
 
+/// Yaesu FT-710, CAT Operation Reference Manual
 class RIG_FT710 : public rigbase {
 private:
-	bool notch_on;
+/// manual notch state last read
+	bool m_notch_on;
+/// 60 m combo entry last selected
 	int  m_60m_indx;
+
+/// last good raw reading (0-255) of each RM meter, indexed by RM P1
+	int  m_meter_raw[9];
+
+	size_t last_frame(const char *prefix, size_t length);
+	bool fixed_width(int mode);
+	int  read_meter(int meter, const char *label);
+
 public:
 	RIG_FT710();
 	~RIG_FT710() {}
 
-	virtual void initialize();
+	void initialize();
 
-	virtual bool check();
+	bool check();
 
-	virtual unsigned long long get_vfoA();
-	virtual void set_vfoA(unsigned long long);
+	unsigned long long get_vfoA();
+	void set_vfoA(unsigned long long frequency);
 
-	virtual unsigned long long get_vfoB();
-	virtual void set_vfoB(unsigned long long);
+	unsigned long long get_vfoB();
+	void set_vfoB(unsigned long long frequency);
 
-	virtual int get_vfoAorB();
+	int  get_vfoAorB();
 
-	virtual bool twovfos();
-	virtual void selectA();
-	virtual void selectB();
-	virtual void A2B();
-	virtual bool can_split();
-	virtual void set_split(bool val);
-	virtual int  get_split();
+	bool twovfos();
+	void selectA();
+	void selectB();
+	void A2B();
+	bool can_split();
+	void set_split(bool split_on);
+	int  get_split();
 
-	virtual void swapAB();
-	virtual bool canswap() { return true; }
+	void swapAB();
+	bool canswap() {
+		return true;
+	}
 
-	virtual void set_modeA(int val);
-	virtual int  get_modeA();
-	virtual int  get_modetype(int n);
+	void set_modeA(int mode);
+	int  get_modeA();
+	int  get_modetype(int mode);
 
-	virtual void set_modeB(int val);
-	virtual int  get_modeB();
+	void set_modeB(int mode);
+	int  get_modeB();
 
-	virtual void set_bwA(int val);
-	virtual int  get_bwA();
+	void set_bwA(int bw_index);
+	int  get_bwA();
 
-	virtual void set_bwB(int val);
-	virtual int  get_bwB();
+	void set_bwB(int bw_index);
+	int  get_bwB();
 
-	virtual int  adjust_bandwidth(int val);
-	virtual int  def_bandwidth(int val);
+	int  adjust_bandwidth(int mode);
+	int  def_bandwidth(int mode);
 
-	virtual void set_BANDWIDTHS(std::string s);
-	virtual std::string get_BANDWIDTHS();
+	void set_BANDWIDTHS(std::string widths);
+	std::string get_BANDWIDTHS();
 
-	virtual int  get_smeter();
-	virtual int  get_swr();
-	virtual int  get_alc();
-	virtual double get_idd();
-	virtual double get_voltmeter();
+	int  get_smeter();
+	int  get_swr();
+	int  get_alc();
+	double get_idd();
+	double get_voltmeter();
 
-	virtual int  get_power_out();
-	virtual double get_power_control();
-	virtual void set_power_control(double val);
-	virtual void get_pc_min_max_step(double &min, double &max, double &step) {
-		min = 5; pmax = max = 100; step = 1; }
+	int  get_power_out();
+	double get_power_control();
+	void set_power_control(double watts);
+	void get_pc_min_max_step(double &min, double &max, double &step) {
+		min = 5;
+		pmax = max = 100;
+		step = 1;
+	}
 
-	void set_squelch(int val);
+	void set_squelch(int level);
 	int  get_squelch();
 	void get_squelch_min_max_step(int &min, int &max, int &step) {
-		min = 0; max = 100; step = 5; }
+		min = 0;
+		max = 100;
+		step = 5;
+	}
 
-	virtual void set_volume_control(int val);
-	virtual int  get_volume_control();
-	virtual void set_PTT_control(int val);
-	virtual int  get_PTT();
-	virtual void tune_rig(int);
-	virtual int  get_tune();
+	void set_volume_control(int volume);
+	int  get_volume_control();
+	void set_PTT_control(int ptt_on);
+	int  get_PTT();
+	void tune_rig(int action);
+	int  get_tune();
 
-	virtual int  next_attenuator();
-	virtual void set_attenuator(int val);
-	virtual int  get_attenuator();
-	virtual int  next_preamp();
-	virtual void set_preamp(int val);
-	virtual int  get_preamp();
+	int  next_attenuator();
+	void set_attenuator(int atten);
+	int  get_attenuator();
+	int  next_preamp();
+	void set_preamp(int preamp);
+	int  get_preamp();
 
-	virtual void set_if_shift(int val);
-	virtual bool get_if_shift(int &val);
-	virtual void get_if_min_max_step(int &min, int &max, int &step);
+	void set_if_shift(int shift);
+	bool get_if_shift(int &shift);
+	void get_if_min_max_step(int &min, int &max, int &step);
 
-	virtual void set_notch(bool on, int val);
-	virtual bool get_notch(int &val);
-	virtual void get_notch_min_max_step(int &min, int &max, int &step);
+	void set_notch(bool notch_on, int frequency);
+	bool get_notch(int &frequency);
+	void get_notch_min_max_step(int &min, int &max, int &step);
 
-	virtual void set_auto_notch(int v);
-	virtual int  get_auto_notch();
+	void set_auto_notch(int notch_on);
+	int  get_auto_notch();
 
-	virtual void set_noise(bool b);
-	virtual int  get_noise();
+/// noise blanker
+	void set_noise(bool nb_on);
+	int  get_noise();
 
-	virtual void set_mic_gain(int val);
-	virtual int  get_mic_gain();
-	virtual void get_mic_min_max_step(int &min, int &max, int &step);
+	void set_mic_gain(int gain);
+	int  get_mic_gain();
+	void get_mic_min_max_step(int &min, int &max, int &step);
 
-	virtual void set_rf_gain(int val);
-	virtual int  get_rf_gain();
-	virtual void get_rf_min_max_step(int &min, int &max, int &step);
-	virtual std::vector<std::string>& bwtable(int);
+	void set_rf_gain(int gain);
+	int  get_rf_gain();
+	void get_rf_min_max_step(int &min, int &max, int &step);
+	std::vector<std::string>& bwtable(int mode);
 
-	virtual void set_vox_onoff();
-	virtual void set_vox_gain();
-	virtual void set_vox_anti();
-	virtual void set_vox_hang();
-	virtual void set_vox_on_dataport();
+	void set_vox_onoff();
+	void set_vox_gain();
+	void set_vox_anti();
+	void get_vox_anti_min_max_step(int &min, int &max, int &step) {
+		min = 1;
+		max = 100;
+		step = 1;
+	}
+	void get_vox_anti_min_max_step(double &min, double &max, double &step) {
+		min = 1;
+		max = 100;
+		step = 1;
+	}
+	void set_vox_hang();
+	void set_vox_on_dataport();
 
-	virtual void get_cw_wpm_min_max(int &min, int &max) {
-		min = 4; max = 60; }
+	void get_cw_wpm_min_max(int &min, int &max) {
+		min = 4;
+		max = 60;
+	}
 
-	virtual void set_cw_weight();
-	virtual void set_cw_wpm();
-	virtual void enable_keyer();
-	virtual void set_cw_qsk();
-//	virtual void set_cw_vol();
-	virtual bool set_cw_spot();
-//	virtual void set_cw_spot_tone();
+	void set_cw_weight();
+	void set_cw_wpm();
+	void enable_keyer();
+	void set_cw_qsk();
+	bool set_cw_spot();
 	void set_break_in();
 	int  get_break_in();
 
-	virtual void get_band_selection(int v);
+	void get_band_selection(int band);
 
+/// noise reduction (DNR)
 	void get_nr_min_max_step(int &min, int &max, int &step) {
-		min = 1; max = 15; step = 1; }	
-	void set_noise_reduction_val(int val);
+		min = 1;
+		max = 15;
+		step = 1;
+	}
+	void set_noise_reduction_val(int level);
 	int  get_noise_reduction_val();
-	void set_noise_reduction(int val);
+	void set_noise_reduction(int nr_on);
 	int  get_noise_reduction();
 
 	void set_xcvr_auto_on();
 	void set_xcvr_auto_off();
 
-	void sync_date(char *dt);
-	void sync_clock(char *tm);
-
+	void sync_date(char *date_str);
+	void sync_clock(char *time_str);
 };
 
-#endif
+#endif // YAESU_FT710_H_INCLUDED
