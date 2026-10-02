@@ -1601,6 +1601,11 @@ void RIG_FT710::set_break_in()
 
 int RIG_FT710::get_break_in()
 {
+/// the FT-710 answers BI only in CW; in other modes it answers ?;
+	int mode = (inuse == onB) ? modeB : modeA;
+	if (mode != mCW_U && mode != mCW_L) {
+		return progStatus.break_in;
+	}
 	cmd = "BI;";
 	wait_char(';', 4, 100, "get break in", ASC);
 	size_t pos = last_frame("BI", 4);
