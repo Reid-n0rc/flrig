@@ -1907,7 +1907,9 @@ public:
 			return;
 		}
 
-		PTT = int(params[0]);
+		int ptt_request = int(params[0]);
+		// tells the poll loop to stop receive polls while waiting
+		PTT = ptt_request;
 
 		std::stringstream s;
 		long start = zmsec();
@@ -1917,6 +1919,10 @@ public:
 		xmlrpc_pending = true;
 		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
 		xmlrpc_pending = false;
+
+		// a poll of the PTT state while waiting for the lock may have
+		// reset PTT to the radio's current state; send the request
+		PTT = ptt_request;
 
 		s << " @ " << ztime();
 		xml_trace(1, (PTT ? "rig_set_verify_ptt ON" : "rig_set_verify_ptt OFF"));
@@ -1954,7 +1960,9 @@ public:
 			return;
 		}
 
-		PTT = int(params[0]);
+		int ptt_request = int(params[0]);
+		// tells the poll loop to stop receive polls while waiting
+		PTT = ptt_request;
 
 		std::stringstream s;
 		long start = zmsec();
@@ -1964,6 +1972,10 @@ public:
 		xmlrpc_pending = true;
 		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
 		xmlrpc_pending = false;
+
+		// a poll of the PTT state while waiting for the lock may have
+		// reset PTT to the radio's current state; send the request
+		PTT = ptt_request;
 
 		s << " @ " << ztime();
 		xml_trace(1, (PTT ? "rig_set_ptt ON" : "rig_set_ptt OFF"));
@@ -2038,7 +2050,9 @@ public:
 
 		std::stringstream s;
 		long start = zmsec();
-		PTT = int(params[0]);
+		int ptt_request = int(params[0]);
+		// tells the poll loop to stop receive polls while waiting
+		PTT = ptt_request;
 
 		s << ztime();
 		#ifdef HAS_XMLRPC_CLIENT_ID
@@ -2049,6 +2063,10 @@ public:
 		xmlrpc_pending = true;
 		guard_lock ser_lock (&mutex_serial, "xml set ptt fast");
 		xmlrpc_pending = false;
+
+		// a poll of the PTT state while waiting for the lock may have
+		// reset PTT to the radio's current state; send the request
+		PTT = ptt_request;
 
 		s << " @ " << ztime();
 
