@@ -40,6 +40,9 @@ extern pthread_mutex_t debug_mutex;
 extern pthread_mutex_t mutex_rcv_socket;
 extern pthread_mutex_t mutex_trace;
 
+/// lock waits longer than this are written to debug_log.txt
+static const long LOCK_WAIT_LOG_MSEC = 100;
+
 /// thread and purpose of a guard_lock that holds a mutex
 struct lock_owner {
 	pthread_t thread;
@@ -109,43 +112,39 @@ guard_lock::guard_lock(pthread_mutex_t* m, std::string h, long tout) :
 		return;
 	}
 
-	for (int i = 0; i < 20; i++) {
-		if (pthread_mutex_trylock(mutex) == 0) {
-			set_lock_owner(mutex, h);
-			m_locked = true;
-			std::string szlock = name(mutex);
-			szlock.append(" try lock ");
-			if (!h.empty()) {
-				how = h;
-				szlock.append(", ").append(how);
-			}
-			lock_trace(1, szlock.c_str());
-			return;
+	if (pthread_mutex_trylock(mutex) == 0) {
+		set_lock_owner(mutex, h);
+		m_locked = true;
+		std::string szlock = name(mutex);
+		szlock.append(" try lock ");
+		if (!h.empty()) {
+			szlock.append(", ").append(h);
 		}
-		MilliSleep(50);
+		lock_trace(1, szlock.c_str());
+		return;
 	}
 
-/// another thread still holds the mutex; wait for it rather than run
-/// without the lock, which lets two threads talk to the transceiver
-/// at once
-	std::string szlock;
-	szlock.assign("lock FAILED ").append(name(mutex));
-	if (!h.empty()) {
-		szlock.append(", ").append(h);
-	}
-	szlock.append(", waiting");
-	failure_trace(1, szlock.c_str());
-
+/// another thread holds the mutex; wait for it in pthread_mutex_lock,
+/// which hands it over as soon as it is unlocked.  Retrying trylock
+/// every 50 msec instead let other threads take it first, and PTT
+/// waited about a second while XML-RPC clients polled meters.
 	std::string holder = lock_holder(mutex);
-	LOG_WARN("%s: waiting for %s, held by %s",
-		h.c_str(), name(mutex), holder.c_str());
 
 	pthread_mutex_lock(mutex);
 	set_lock_owner(mutex, h);
 	m_locked = true;
 
-	LOG_WARN("%s: got %s after %ld msec",
-		h.c_str(), name(mutex), (long)(zmsec() - start_time));
+	long waited = zmsec() - start_time;
+	if (waited > LOCK_WAIT_LOG_MSEC) {
+		std::string szlock;
+		szlock.assign("lock waited ").append(name(mutex));
+		if (!h.empty()) {
+			szlock.append(", ").append(h);
+		}
+		failure_trace(1, szlock.c_str());
+		LOG_WARN("%s: waited %ld msec for %s, held by %s",
+			h.c_str(), waited, name(mutex), holder.c_str());
+	}
 }
 
 guard_lock::~guard_lock(void) {
