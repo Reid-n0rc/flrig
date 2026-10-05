@@ -1894,10 +1894,13 @@ public:
 				++cnt;
 			}
 
-			if (cnt == 500) {
+			if (cnt == 100) {
 //std::cout << "PTT FAILURE!!" << std::endl;
-				exit(1)
-				;
+				// the radio did not follow within 1 sec; report the state
+				// it is in rather than the request
+				LOG_WARN("rig.set_verify_ptt %d: radio still reports %d",
+					val, get);
+				PTT = get;
 			}
 			s << " [ " << zmsec() - start << " msec ]";
 			xml_trace(1, s.str().c_str());
@@ -1933,8 +1936,9 @@ public:
 		{
 			guard_lock ser_lock (&mutex_serial, "xml set ptt");
 //std::cout << ztime() << " gl: " << zmsec() - start << std::endl;
+			const int tries = 20;
 			int n = 0;
-			for (n = 0; n < 20; n++) {
+			for (n = 0; n < tries; n++) {
 				rigPTT(val);
 //std::cout << ztime() << " st: " << zmsec() - start << std::endl; 
 //				MilliSleep(5);
@@ -1942,8 +1946,10 @@ public:
 //std::cout << ztime() << " rp: " << zmsec() - start << std::endl; 
 				MilliSleep(5);
 			}
-			if (n == 10) {
+			if (n == tries) {
 //std::cout << ztime() << " PTT FAILURE!!" << std::endl;
+				LOG_WARN("rig.set_ptt %d: radio did not follow in %d tries",
+					val, tries);
 			} else {
 //std::cout << ztime() << " rd: " << n + 1 << " [ " << zmsec() - start << " msec ]" << std::endl;
 //if (zmsec() - start >= 100)
