@@ -1869,14 +1869,18 @@ public:
 			return;
 		}
 
-		PTT = int(params[0]);
+		int val = int(params[0]);
 
 		std::stringstream s;
 		long start = zmsec();
 
-		s << ztime() << " rig.set_verify_ptt " << (PTT ? "ON " : "OFF ");
+		s << ztime() << " rig.set_verify_ptt " << (val ? "ON " : "OFF ");
 
 		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
+
+		// set PTT only with the lock held: the serial thread's poll sets
+		// it to the radio's state, which would replace the request
+		PTT = val;
 
 		rigPTT(PTT);
 		{
@@ -1972,15 +1976,19 @@ public:
 
 		std::stringstream s;
 		long start = zmsec();
-		PTT = int(params[0]);
+		int val = int(params[0]);
 
 		s << ztime();
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_ptt_fast " << (PTT ? "ON " : "OFF ");
+		s << " rig.set_ptt_fast " << (val ? "ON " : "OFF ");
 
 		guard_lock ser_lock (&mutex_serial, "xml set ptt fast");
+
+		// set PTT only with the lock held: the serial thread's poll sets
+		// it to the radio's state, which would replace the request
+		PTT = val;
 
 		s << " @ " << ztime();
 
