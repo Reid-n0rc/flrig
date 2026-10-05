@@ -651,8 +651,11 @@ void RIG_FT891::set_PTT_control(int val)
 	cmd = val ? "TX1;" : "TX0;";
 
 	set_trace(1, __func__);
+//std::cout << __func__ << " : " << ztime() << " ... ";
 	sendCommand(cmd);
+//std::cout << ztime() << " ... ";
 	sett("");
+//std::cout << ztime() << std::endl;
 	showresp(WARN, ASC, __func__, cmd, replystr);
 
 	ptt_ = val;
@@ -663,7 +666,10 @@ int RIG_FT891::get_PTT()
 	cmd = "TX;";
 
 	get_trace(1, __func__);
+//long start = zmsec();
+//std::cout << ztime() << " " << __func__ << std::endl;
 	wait_char(';', 4, FL891_WAIT_TIME, __func__, ASC);
+//std::cout << ztime() << " " << __func__ << " took " << zmsec() - start << " msec" << std::endl;
 	gett("");
 
 	size_t p = replystr.rfind("TX");

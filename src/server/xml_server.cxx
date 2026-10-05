@@ -54,7 +54,6 @@
 #include "rigpanel.h"
 
 // The server
-bool xmlrpc_pending = false;
 
 XML_DATA xml_A;
 XML_DATA xml_B;
@@ -302,6 +301,9 @@ public:
 //------------------------------------------------------------------------------
 // Request for PTT state
 //------------------------------------------------------------------------------
+
+extern int check_ptt();
+
 class rig_get_ptt : public XmlRpcServerMethod {
 //	bool lastptt = false;
 public:
@@ -318,13 +320,12 @@ public:
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
 
-		if (xml_A.ptt_stale())
+//		if (xml_A.ptt_stale())
 		{
-			xmlrpc_pending = true;
-			guard_lock serial(&mutex_serial, "xml get_ptt");
-			xmlrpc_pending = false;
 
-			int PTT = ptt_state();
+			guard_lock serial(&mutex_serial, "xml get_ptt");
+
+			int PTT = check_ptt();//ptt_state();
 			xml_A.update_ptt(PTT);
 		}
 		s << " [ " << zmsec() - start << " msec ]";
@@ -359,9 +360,7 @@ public:
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml get split");
-		xmlrpc_pending = false;
 
 		int split_state = selrig->get_split();
 		progStatus.split = split_state;
@@ -452,9 +451,8 @@ public:
 
 		if ( xml_A.freq_stale() ) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml get vfoA");
-			xmlrpc_pending = false;
 
 			vfoA.freq = selrig->get_vfoA();
 			xml_A.update_freq(vfoA.freq);
@@ -503,9 +501,8 @@ public:
 
 		if ( xml_B.freq_stale() ) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml get vfoB");
-			xmlrpc_pending = false;
 
 			vfoB.freq = selrig->get_vfoB();
 			xml_B.update_freq(vfoB.freq);
@@ -612,9 +609,7 @@ public:
 		else
 			progStatus.notch = false;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_notch");
-		xmlrpc_pending = false;
 
 		selrig->set_notch(progStatus.notch, progStatus.notch_val);
 		xml_trace(1, "rig_set_notch");
@@ -645,9 +640,7 @@ public:
 		else
 			progStatus.notch = false;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_notch");
-		xmlrpc_pending = false;
 
 		selrig->set_notch(progStatus.notch, progStatus.notch_val);
 		xml_trace(1, "rig_set_verify_notch");
@@ -706,9 +699,7 @@ public:
 		rfg = static_cast<int>((double)((params[0])));
 		progStatus.rfgain = rfg;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_rfgain");
-		xmlrpc_pending = false;
 
 		selrig->set_rf_gain(progStatus.rfgain);
 		xml_trace(1, "rig_set_rfgain");
@@ -735,9 +726,7 @@ public:
 		rfg = static_cast<int>((double)((params[0])));
 		progStatus.rfgain = rfg;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set _verify_rfgain");
-		xmlrpc_pending = false;
 
 		selrig->set_rf_gain(progStatus.rfgain);
 
@@ -771,9 +760,7 @@ public:
 		if (progStatus.rfgain > max) progStatus.rfgain = max;
 		if (progStatus.rfgain < min) progStatus.rfgain = min;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_mod_rfgain");
-		xmlrpc_pending = false;
 
 		selrig->set_rf_gain(progStatus.rfgain);
 		xml_trace(1, "rig_mod_rfgain");
@@ -832,9 +819,7 @@ public:
 		micg = (int)(params[0]);
 		progStatus.mic_gain = micg;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_micgain");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_set_micgain");
 		selrig->set_mic_gain(progStatus.mic_gain);
@@ -861,9 +846,7 @@ public:
 		micg = (int)(params[0]);
 		progStatus.mic_gain = micg;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_micgain");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_set_verify_micgain");
 		selrig->set_mic_gain(progStatus.mic_gain);
@@ -925,9 +908,7 @@ public:
 		volume = (int)(params[0]);
 		progStatus.volume = volume;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_volume");
-		xmlrpc_pending = false;
 
 		selrig->set_volume_control(progStatus.volume);
 		xml_trace(1, "rig_set_volume");
@@ -954,9 +935,7 @@ public:
 		volume = (int)(params[0]);
 		progStatus.volume = volume;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_volume");
-		xmlrpc_pending = false;
 
 		selrig->set_volume_control(progStatus.volume);
 
@@ -989,9 +968,7 @@ public:
 		if (progStatus.volume > max) progStatus.volume = max;
 		if (progStatus.volume < min) progStatus.volume = min;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_mod_volume");
-		xmlrpc_pending = false;
 
 		selrig->set_volume_control(progStatus.volume);
 		xml_trace(1, "rig_mod_volume");
@@ -1022,9 +999,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_modes");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_modes");
 		try {
@@ -1038,7 +1013,6 @@ public :
 			modes[0] = "CW";
 			modes[1] = "LSB";
 			modes[2] = "USB";
-			xmlrpc_pending = false;
 			return;
 		}
 
@@ -1066,9 +1040,7 @@ public:
 		}
 		int mode;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_sideband");
-		xmlrpc_pending = false;
 
 		mode = vfo->imode;
 
@@ -1152,10 +1124,9 @@ public:
 		try {
 
 			if (xml_A.mode_stale()) {
-				xmlrpc_pending = true;
+	
 				guard_lock serial_lock(&mutex_serial, "xml rig_get_modeA");
-				xmlrpc_pending = false;
-
+	
 				vfoA.imode = selrig->get_modeA();
 				xml_A.update_mode(vfoA.imode);
 			}
@@ -1204,10 +1175,9 @@ public:
 
 		try {
 			if (xml_B.mode_stale()) {
-				xmlrpc_pending = true;
+	
 				guard_lock serial_lock(&mutex_serial, "xml rig_get_modeB");
-				xmlrpc_pending = false;
-
+	
 				vfoB.imode = selrig->get_modeB();
 				xml_B.update_mode(vfoB.imode);
 			}
@@ -1257,9 +1227,8 @@ public :
 
 
 		try {
-			xmlrpc_pending = true;
+
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_bws");
-			xmlrpc_pending = false;
 
 			int mode = (selrig->inuse == onB) ? vfoB.imode : vfoA.imode;
 			std::vector<std::string>& bwt = selrig->bwtable(mode);
@@ -1331,10 +1300,9 @@ public:
 			BW = vfoB.iBW;
 			mode = vfoB.imode;
 			if ( xml_B.bw_stale() ) {
-				xmlrpc_pending = true;
+	
 				guard_lock serial_lock (&mutex_serial, "xml rig get bw");
-				xmlrpc_pending = false;
-
+	
 				mode = vfoB.imode = selrig->get_modeB();
 				BW = vfoB.iBW = selrig->get_bwB();
 				xml_B.update_mode(mode);
@@ -1344,10 +1312,9 @@ public:
 			BW = vfoA.iBW;
 			mode = vfoA.imode;
 			if ( xml_A.bw_stale() ) {
-				xmlrpc_pending = true;
+	
 				guard_lock serial_lock (&mutex_serial, "xml rig get bw");
-				xmlrpc_pending = false;
-
+	
 				mode = vfoA.imode = selrig->get_modeA();
 				BW = vfoA.iBW = selrig->get_bwA();
 				xml_A.update_mode(mode);
@@ -1438,7 +1405,7 @@ public:
 		s << " [" << XmlRpc::client_id << "]";
 #endif
 		s << " [ " << zmsec() - t0 << " msec ]";
-		s << " bandwidth on A";
+		s << " bandwidth on A ";
 		s << s1;
 		if (!s2.empty()) s << " | " << s2;
 		xml_trace( 1, s.str().c_str() );
@@ -1496,7 +1463,7 @@ public:
 		s << " [" << XmlRpc::client_id << "]";
 #endif
 		s << " [ " << zmsec() - t0 << " msec ]";
-		s << " bandwidth on B";
+		s << " bandwidth on B ";
 		s << s1;
 		if (!s2.empty()) s << " | " << s2;
 		xml_trace( 1, s.str().c_str() );
@@ -1612,9 +1579,8 @@ public:
 			result = (int)(0);
 		else {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial_lock(&mutex_serial, "xml pwr scale");
-			xmlrpc_pending = false;
 
 			result = (int)(selrig->power_scale());
 		}
@@ -1647,9 +1613,8 @@ public:
 			result = "0";
 		else {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial_lock(&mutex_serial, "xml pwr meter");
-			xmlrpc_pending = false;
 
 			int val = selrig->get_power_out();
 			char szmeter[20];
@@ -1675,9 +1640,8 @@ public:
 			result = "0";
 		else {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial_lock(&mutex_serial, "xml swr meter");
-			xmlrpc_pending = false;
 
 			int val = selrig->get_swr();
 			char szmeter[20];
@@ -1715,9 +1679,8 @@ public:
 		else {
 			PAIRS swr_pairs( define_PAIR(swr_tbl) );
 
-			xmlrpc_pending = true;
+
 			guard_lock serial_lock(&mutex_serial, "xml swr");
-			xmlrpc_pending = false;
 
 			int val = selrig->get_swr();
 			double swr = swr_pairs.value(val);
@@ -1867,9 +1830,8 @@ public:
 			cbTune();
 		else {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial_lock(&mutex_serial, "xml tune");
-			xmlrpc_pending = false;
 
 			selrig->tune_rig(2);
 		}
@@ -1904,25 +1866,29 @@ public:
 
 		s << ztime() << " rig.set_verify_ptt " << (PTT ? "ON " : "OFF ");
 
-		xmlrpc_pending = true;
 		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
-		xmlrpc_pending = false;
-
-		s << " @ " << ztime();
-		xml_trace(1, (PTT ? "rig_set_verify_ptt ON" : "rig_set_verify_ptt OFF"));
 
 		rigPTT(PTT);
 		{
-			bool get = ptt_state();
+			bool get = 0;
 			int cnt = 0;
-			while ((get != PTT) && (cnt++ < 100)) {
-				MilliSleep(10);
+			while (cnt < 100) {
 				get = ptt_state();
+//std::cout << "PTT: " << PTT << ", ptt state: " << get << std::endl;
+				if (PTT == get) break;
+				MilliSleep(10);
+				++cnt;
 			}
-			PTT = get;
 
-			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
+			if (cnt == 500) {
+//std::cout << "PTT FAILURE!!" << std::endl;
+				exit(1)
+				;
+			}
+			s << " [ " << zmsec() - start << " msec ]";
 			xml_trace(1, s.str().c_str());
+
+//std::cout << s.str() << std::endl;
 
 			Fl::awake(update_UI_PTT);
 		}
@@ -1944,70 +1910,38 @@ public:
 			return;
 		}
 
-		PTT = int(params[0]);
+		int val = int(params[0]);
 
-		std::stringstream s;
-		long start = zmsec();
+//		long start = zmsec();
+//std::cout << "================================" << std::endl;
+//std::cout << ztime() << " rig.set_ptt " << (val ? "ON  " : "OFF ") << std::endl;
 
-		s << ztime() << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
-
-		xmlrpc_pending = true;
-		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
-		xmlrpc_pending = false;
-
-		s << " @ " << ztime();
-		xml_trace(1, (PTT ? "rig_set_ptt ON" : "rig_set_ptt OFF"));
-
-		rigPTT(PTT);
 		{
-			bool get = ptt_state();
-			int cnt = 0;
-			while ((get != PTT) && (cnt++ < 100)) {
-				MilliSleep(10);
-				get = ptt_state();
+			guard_lock ser_lock (&mutex_serial, "xml set ptt");
+//std::cout << ztime() << " gl: " << zmsec() - start << std::endl;
+			int n = 0;
+			for (n = 0; n < 20; n++) {
+				rigPTT(val);
+//std::cout << ztime() << " st: " << zmsec() - start << std::endl; 
+//				MilliSleep(5);
+				if (val == check_ptt()) break;
+//std::cout << ztime() << " rp: " << zmsec() - start << std::endl; 
+				MilliSleep(5);
 			}
-			PTT = get;
-
-			xml_A.update_ptt(PTT);
-
-			s << " # " << ztime() << " [ " << zmsec() - start << " msec ]";
-			xml_trace(1, s.str().c_str());
-
-			Fl::awake(update_UI_PTT);
-		}
-/*
-		Fl::awake(connection_ON);
-
-		if (!xcvr_online || disable_xmlrpc->value()) {
-			result = 0;
-			return;
+			if (n == 10) {
+//std::cout << ztime() << " PTT FAILURE!!" << std::endl;
+			} else {
+//std::cout << ztime() << " rd: " << n + 1 << " [ " << zmsec() - start << " msec ]" << std::endl;
+//if (zmsec() - start >= 100)
+//	std::cout << "###################################################" << std::endl;
+				PTT = val;
+				xml_A.update_ptt(PTT);
+				Fl::awake(update_UI_PTT);
+			}
+//std::cout << "---------------------------------" << std::endl;
 		}
 
-		PTT = int(params[0]);
-
-		std::stringstream s;
-		long start = zmsec();
-
-		s << ztime();
-		#ifdef HAS_XMLRPC_CLIENT_ID
-			s << " [" << XmlRpc::client_id << "]";
-		#endif
-
-		s << " rig.set_ptt " << (PTT ? "ON " : "OFF ");
-		s << " {" << zmsec() - start << " msec}";
-		xmlrpc_pending = true;
-		guard_lock ser_lock (&mutex_serial, "xml set ptt");
-		xmlrpc_pending = false;
-
-		s << " <" << zmsec() - start << " msec>";
-
-		rigPTT(PTT);
-
-		s << " [ " << zmsec() - start << " msec ]";
-		xml_trace(1, s.str().c_str());
-
-		Fl::awake(update_UI_PTT);
-*/
+//		xml_trace(1, s.str().c_str());
 	}
 
 	std::string help() { return std::string("sets PTT on (1) or off (0), waits for state change"); }
@@ -2036,9 +1970,7 @@ public:
 		#endif
 		s << " rig.set_ptt_fast " << (PTT ? "ON " : "OFF ");
 
-		xmlrpc_pending = true;
 		guard_lock ser_lock (&mutex_serial, "xml set ptt fast");
-		xmlrpc_pending = false;
 
 		s << " @ " << ztime();
 
@@ -2230,9 +2162,7 @@ public:
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_AB");
-		xmlrpc_pending = false;
 
 		if (ans == "A") {
 			selrig->selectA();
@@ -2269,9 +2199,7 @@ public:
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_AB");
-		xmlrpc_pending = false;
 
 		if (ans == "A") {
 			selrig->selectA();
@@ -2313,9 +2241,8 @@ public:
 
 		if (freq != vfoA.freq) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml set vfoA");
-			xmlrpc_pending = false;
 
 			s << " @ " << ztime();
 
@@ -2365,9 +2292,8 @@ public:
 
 		if (vfoA.freq != freq) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml set verify vfoA");
-			xmlrpc_pending = false;
 
 			if (!selrig->can_change_alt_vfo  && (selrig->inuse == onB)) {
 				selrig->selectA();
@@ -2413,9 +2339,8 @@ public:
 
 		if (vfoA.freq != freq) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml set vfoA fast");
-			xmlrpc_pending = false;
 
 			s << " @ " << ztime();
 
@@ -2455,9 +2380,8 @@ public:
 
 		if (freq != vfoA.freq) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml mod vfoA");
-			xmlrpc_pending = false;
 
 			if (!selrig->can_change_alt_vfo  && (selrig->inuse == onB)) {
 				selrig->selectA();
@@ -2503,9 +2427,8 @@ public:
 
 		if (vfoB.freq != freq) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml set vfoB");
-			xmlrpc_pending = false;
 
 			if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 				selrig->selectB();
@@ -2552,9 +2475,8 @@ public:
 
 		if (vfoB.freq != freq) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml set verify vfoB");
-			xmlrpc_pending = false;
 
 			if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 				selrig->selectB();
@@ -2602,9 +2524,8 @@ public:
 
 		if (vfoB.freq != freq) {
 
-			xmlrpc_pending = true;
+
 			guard_lock serial(&mutex_serial, "xml set vfoB fast");
-			xmlrpc_pending = false;
 
 			s << " @ " << ztime();
 
@@ -2645,9 +2566,7 @@ public:
 
 		if (freq == vfoB.freq) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml mod vfoB");
-		xmlrpc_pending = false;
 
 		if (!selrig->can_change_alt_vfo  && (selrig->inuse == onA)) {
 			selrig->selectB();
@@ -2685,9 +2604,7 @@ public:
 
 		if ((vfoB.freq == vfoA.freq) && (vfoB.imode == vfoA.imode)) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml vfoA2B");
-		xmlrpc_pending = false;
 
 		vfoB.freq = vfoA.freq;
 		vfoB.imode = vfoA.imode;
@@ -2720,9 +2637,7 @@ public:
 
 		if ((vfoA.freq == vfoB.freq) && (vfoA.imode == vfoB.imode)) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml freqA2B");
-		xmlrpc_pending = false;
 
 		vfoB.freq = vfoA.freq;
 
@@ -2753,9 +2668,7 @@ public:
 
 		if (vfoB.imode == vfoA.imode) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml modeA2B");
-		xmlrpc_pending = false;
 
 		vfoB.imode = vfoA.imode;
 
@@ -2795,9 +2708,7 @@ public:
 		#endif
 		s << " rig.set_vfo ";
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml set vfo");
-		xmlrpc_pending = false;
 
 		s << " @ " << ztime();
 
@@ -2844,9 +2755,7 @@ public:
 		#endif
 		s  << " rig.set_verify_vfo ";
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml set verify vfo");
-		xmlrpc_pending = false;
 
 		s << " @ " << ztime();
 
@@ -2885,9 +2794,7 @@ public:
 		if ((selrig->inuse == onB) && (freq == vfoB.freq)) return;
 		if ((selrig->inuse == onA) && (freq == vfoA.freq)) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml set frequency");
-		xmlrpc_pending = false;
 
 		if (selrig->inuse == onB) {
 			selrig->set_vfoB(freq);
@@ -2920,9 +2827,7 @@ public:
 		if ((selrig->inuse == onB) && (freq == vfoB.freq)) return;
 		if ((selrig->inuse == onA) && (freq == vfoA.freq)) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml rig set frequency");
-		xmlrpc_pending = false;
 
 		if (selrig->inuse == onB) {
 			selrig->set_vfoB(freq);
@@ -2956,9 +2861,7 @@ public:
 		if ((selrig->inuse == onB) && (freq == vfoB.freq)) return;
 		if ((selrig->inuse == onA) && (freq == vfoA.freq)) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial(&mutex_serial, "xml set verify frequency");
-		xmlrpc_pending = false;
 
 		if (selrig->inuse == onB) {
 			selrig->set_vfoB(freq);
@@ -3012,10 +2915,9 @@ public:
 					if (selrig->inuse == onB) {
 						if ((int)imode != vfoB.imode) {
 
-							xmlrpc_pending = true;
+				
 							guard_lock serial(&mutex_serial, "xml set mode");
-							xmlrpc_pending = false;
-
+				
 							vfo->imode = vfoB.imode = imode;
 							selrig->set_modeB(imode);
 							vfo->iBW = vfoB.iBW = selrig->def_bandwidth(imode);
@@ -3025,10 +2927,9 @@ public:
 					} else {
 						if ((int)imode != vfoA.imode) {
 
-							xmlrpc_pending = true;
+				
 							guard_lock serial(&mutex_serial, "xml set mode");
-							xmlrpc_pending = false;
-
+				
 							vfo->imode = vfoA.imode = imode;
 							selrig->set_modeA(imode);
 							vfo->iBW = vfoA.iBW = selrig->def_bandwidth(imode);
@@ -3049,7 +2950,6 @@ xml_trace(1, s.str().c_str());
 s << " ERROR: " << e.what();
 xml_trace(1, s.str().c_str());
 			LOG_ERROR("%s", e.what());
-			xmlrpc_pending = false;
 		}
 
 	}
@@ -3083,10 +2983,9 @@ public:
 						if ((int)imode != vfoB.imode) {
 							s << "rig_set_verify mode @ " << ztime();
 
-							xmlrpc_pending = true;
+				
 							guard_lock serial(&mutex_serial, "xml set mode");
-							xmlrpc_pending = false;
-
+				
 							vfo->imode = vfoB.imode = imode;
 							selrig->set_modeB(imode);
 							vfo->iBW = vfoB.iBW = selrig->def_bandwidth(imode);
@@ -3097,10 +2996,9 @@ public:
 						if ((int)imode != vfoA.imode) {
 							s << "rig_set_verify mode @ " << ztime();
 
-							xmlrpc_pending = true;
+				
 							guard_lock serial(&mutex_serial, "xml set mode");
-							xmlrpc_pending = false;
-
+				
 							vfo->imode = vfoA.imode = imode;
 							selrig->set_modeA(imode);
 							vfo->iBW = vfoA.iBW = selrig->def_bandwidth(imode);
@@ -3117,7 +3015,6 @@ public:
 			return;
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());
-			xmlrpc_pending = false;
 		}
 
 		return;
@@ -3163,10 +3060,9 @@ public:
 					if ((int)imode != vfoA.imode) {
 						s << " rig.set_modeA " << numode << " @ " << ztime();
 
-						xmlrpc_pending = true;
+			
 						guard_lock serial(&mutex_serial, "xml set modeA");
-						xmlrpc_pending = false;
-
+			
 						vfo->imode = vfoA.imode = imode;
 						selrig->set_modeA(imode);
 						vfo->iBW = vfoA.iBW = selrig->def_bandwidth(imode);
@@ -3186,7 +3082,6 @@ public:
 			return;
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());
-			xmlrpc_pending = false;
 		}
 
 
@@ -3220,10 +3115,9 @@ public:
 					if ((int)imode != vfoA.imode) {
 						s << "set_verify_modeA @ " << ztime();
 
-						xmlrpc_pending = true;
+			
 						guard_lock serial(&mutex_serial, "xml set modeA");
-						xmlrpc_pending = false;
-
+			
 						vfo->imode = vfoA.imode = imode;
 						selrig->set_modeA(imode);
 						vfo->iBW = vfoA.iBW = selrig->def_bandwidth(imode);
@@ -3239,7 +3133,6 @@ public:
 			return;
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());
-			xmlrpc_pending = false;
 		}
 
 	}
@@ -3281,10 +3174,9 @@ public:
 					if ((int)imode != vfoB.imode) {
 						s << " rig.set_modeB " << numode << " @  " << ztime();
 
-						xmlrpc_pending = true;
+			
 						guard_lock serial(&mutex_serial, "xml set modeB");
-						xmlrpc_pending = false;
-
+			
 						vfo->imode = vfoB.imode = imode;
 						selrig->set_modeB(imode);
 						vfo->iBW = vfoB.iBW = selrig->def_bandwidth(imode);
@@ -3304,7 +3196,6 @@ public:
 			return;
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());
-			xmlrpc_pending = false;
 		}
 
 	}
@@ -3336,10 +3227,9 @@ public:
 					if ((int)imode != vfoB.imode) {
 						s << " rig.set_modeB " << numode << " @  " << ztime();
 
-						xmlrpc_pending = true;
+			
 						guard_lock serial(&mutex_serial, "xml set modeB");
-						xmlrpc_pending = false;
-
+			
 						vfo->imode = vfoB.imode = imode;
 						selrig->set_modeB(imode);
 						vfo->iBW = vfoB.iBW = selrig->def_bandwidth(imode);
@@ -3355,7 +3245,6 @@ public:
 			return;
 		} catch (const std::exception& e) {
 			LOG_ERROR("%s", e.what());
-			xmlrpc_pending = false;
 		}
 
 	}
@@ -3396,9 +3285,7 @@ public:
 		}
 		int bw = (int)params[0];
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_bandwidth");
-		xmlrpc_pending = false;
 
 //		XCVR_STATE nuvals;
 		int iBW = 0;
@@ -3453,9 +3340,7 @@ public:
 		}
 		int bw = int(params[0]);
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_bandwidth");
-		xmlrpc_pending = false;
 
 		XCVR_STATE nuvals;
 
@@ -3523,9 +3408,7 @@ public:
 			}
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_bw");
-		xmlrpc_pending = false;
 
 		nuvals.iBW = bw;
 		if (selrig->inuse == onB) {
@@ -3574,9 +3457,7 @@ public:
 			}
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_bw");
-		xmlrpc_pending = false;
 
 		int retbw;
 		nuvals.iBW = bw;
@@ -3628,9 +3509,7 @@ public:
 			}
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_BW");
-		xmlrpc_pending = false;
 
 		if (selrig->inuse == onB) {
 		nuvals.freq = vfoB.freq;
@@ -3680,9 +3559,7 @@ public:
 			}
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_BW");
-		xmlrpc_pending = false;
 
 		int retbw;
 		nuvals.iBW = bw;
@@ -3718,9 +3595,7 @@ public:
 		XCVR_STATE nuvals;
 		int bwch = (int)params[0];
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_mod_bandwidth");
-		xmlrpc_pending = false;
 
 		if (selrig->inuse == onB) {
 			nuvals.freq  = vfoB.freq;
@@ -3783,9 +3658,7 @@ public:
 
 		if (!xcvr_online || disable_xmlrpc->value() || !selrig->has_pbt_controls) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_");
-		xmlrpc_pending = false;
 
 		char inner[10];
 		char outer[10];
@@ -3816,9 +3689,7 @@ public:
 
 		if (!xcvr_online || disable_xmlrpc->value() || !selrig->has_pbt_controls) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_");
-		xmlrpc_pending = false;
 
 		char inner[10];
 		snprintf(inner, sizeof(inner), "%d", progStatus.pbt_inner);
@@ -3846,9 +3717,7 @@ public:
 
 		if (!xcvr_online || disable_xmlrpc->value() || !selrig->has_pbt_controls) return;
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_");
-		xmlrpc_pending = false;
 
 		char outer[10];
 		snprintf(outer, sizeof(outer), "%d", progStatus.pbt_outer);
@@ -3875,9 +3744,7 @@ public:
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_pbt");
-		xmlrpc_pending = false;
 
 		progStatus.pbt_inner = (int)(params[0]);
 		progStatus.pbt_outer = (int)(params[1]);
@@ -3904,9 +3771,7 @@ public:
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_pbt_inner");
-		xmlrpc_pending = false;
 
 		progStatus.pbt_inner = (int)(params[0]);
 
@@ -3931,9 +3796,7 @@ public:
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_set_pbt_outer");
-		xmlrpc_pending = false;
 
 		progStatus.pbt_outer = (int)(params[0]);
 
@@ -4005,9 +3868,8 @@ public:
 		std::string cmd = recv_hex(command);
 
 		{
-			xmlrpc_pending = true;
+
 			guard_lock serial_lock(&mutex_serial, "rig_cmd_string");
-			xmlrpc_pending = false;
 
 			RigSerial->WriteBuffer(cmd.c_str(), cmd.length());
 			xml_trace(2, "xmlrpc command:", cmd.c_str());
@@ -4263,9 +4125,7 @@ public:
 		if (!xcvr_online || disable_xmlrpc->value() || !selrig->has_agc_control)
 			result = "0";
 		else {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml get agc");
-			xmlrpc_pending = false;
 
 			int val = selrig->get_agc();
 
@@ -4291,9 +4151,7 @@ public:
 		if (!xcvr_online || disable_xmlrpc->value() || !selrig->has_agc_control)
 			result = "0";
 		else {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml incr agc");
-			xmlrpc_pending = false;
 
 			selrig->incr_agc();
 
@@ -4328,9 +4186,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_agc_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->agc_label();
 
@@ -4367,9 +4223,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_agc_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_agc_labels");
 		try {
@@ -4410,9 +4264,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_att_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->att_label();
 
@@ -4449,9 +4301,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_att_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_att_labels");
 		try {
@@ -4492,9 +4342,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_pre_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->pre_label();
 
@@ -4531,9 +4379,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_pre_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_pre_labels");
 		try {
@@ -4574,9 +4420,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_nb_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->nb_label();
 
@@ -4613,9 +4457,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_nb_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_nb_labels");
 		try {
@@ -4656,9 +4498,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_nr_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->nr_label();
 
@@ -4695,9 +4535,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_nr_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_nr_labels");
 		try {
@@ -4738,9 +4576,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_bk_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->bk_label();
 
@@ -4777,9 +4613,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_bk_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_bk_labels");
 		try {
@@ -4820,9 +4654,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_60M_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->m60_label();
 
@@ -4859,9 +4691,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_60M_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_60M_labels");
 		try {
@@ -4902,9 +4732,7 @@ public:
 		std::string str_val;
 
 		try {
-			xmlrpc_pending = true;
 			guard_lock serial_lock(&mutex_serial, "xml rig_get_an_label");
-			xmlrpc_pending = false;
 
 			str_val = selrig->an_label();
 
@@ -4941,9 +4769,7 @@ public :
 			return;
 		}
 
-		xmlrpc_pending = true;
 		guard_lock serial_lock(&mutex_serial, "xml rig_get_an_labels");
-		xmlrpc_pending = false;
 
 		xml_trace(1, "rig_get_an_labels");
 		try {

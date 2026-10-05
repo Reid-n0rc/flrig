@@ -1253,15 +1253,16 @@ void set_ptt(void *d)
 	show_meters(d);
 }
 
-void check_ptt()
+int check_ptt()
 {
 	if (selrig->name_ == rig_FT817.name_ ||
 		selrig->name_ == rig_FT817BB.name_ ||
 		selrig->name_ == rig_FT818ND.name_ ) {
-		return;
+		return PTT;
 	}
-	PTT = ptt_state();
-	xml_A.update_ptt(PTT);
+	return ptt_state();
+//	PTT = ptt_state();
+//	xml_A.update_ptt(PTT);
 }
 
 void check_break_in()
@@ -1720,18 +1721,18 @@ struct POLL_PAIR {
 
 POLL_PAIR RX_poll_group_1[] = {
 	{&progStatus.poll_smeter, read_smeter, "SMETER"},
-	{&progStatus.poll_frequency, read_vfo, "FREQ"},
 	{NULL, NULL, ""}
 };
 
 POLL_PAIR RX_poll_group_2[] = {
+	{&progStatus.poll_frequency, read_vfo, "FREQ"},
 	{&progStatus.poll_mode, read_mode, "MODE"},
 	{&progStatus.poll_bandwidth, read_bandwidth, "BW"},
-//	{&progStatus.poll_vfoAorB, read_vfoAorB, "A/B"},
 	{NULL, NULL, ""}
 };
 
 POLL_PAIR RX_poll_group_3[] = {
+//	{&progStatus.poll_vfoAorB, read_vfoAorB, "A/B"},
 	{&progStatus.poll_volume, read_volume, "volume"},
 	{&progStatus.poll_micgain, read_mic_gain, "mic gain"},
 	{&progStatus.poll_rfgain, read_rfgain, "rfgain"},
@@ -1810,17 +1811,17 @@ int read_tune()
 
 void * serial_thread_loop(void *d)
 {
-extern bool xmlrpc_pending;
 
 	POLL_PAIR *rx_poll_group_1 = &RX_poll_group_1[0];
 	POLL_PAIR *rx_poll_group_2 = &RX_poll_group_2[0];
 	POLL_PAIR *rx_poll_group_3 = &RX_poll_group_3[0];
 	POLL_PAIR *tx_polling = &TX_poll_pairs[0];
 	bool isRX = false;
+	bool tuning = false;
+
+	int poll_interval = progStatus.serloop_timing;
 
 	for(;;) {
-
-		MilliSleep(progStatus.serloop_timing);
 
 		if (!run_serial_thread) {
 			break;
@@ -1830,21 +1831,21 @@ extern bool xmlrpc_pending;
 			goto serial_bypass_loop;
 		}
 
-		if (xmlrpc_pending)
-			goto serial_bypass_loop;
-
 		if (RigSerial->failed() >= MAX_FAILURES) {
 			Fl::awake(serial_failed);
 		}
 
-//		if (progStatus.poll_ptt) {
 		{
+			MilliSleep(10);
+			poll_interval -= 10;
+//std::cout << ztime() << " poll ptt: " << std::endl;
 			guard_lock lk( &mutex_serial, std::string(__func__).append(" ").append("ptt"));
-			check_ptt();
+			PTT = check_ptt();
+//restd::cout << ztime() << " pole tune: " << std::endl;
+			tuning = read_tune();
 		}
-		if (xmlrpc_pending) goto serial_bypass_loop;
 
-		if (PTT || (!PTT && read_tune()) ||
+		if (PTT || tuning ||
 			cwio_process == SEND ||
 			cwio_process == CALIBRATE ||
 			cwio_process == KEYDOWN ) {
@@ -1856,32 +1857,30 @@ extern bool xmlrpc_pending;
 			Fl::awake(show_meters, (void *)1);
 
 			if (progStatus.poll_frequency) {
+				MilliSleep(10);
+				poll_interval -= 10;
 				guard_lock lk( &mutex_serial,
 					std::string(__func__).append(" ").append("vfo"));
 				read_vfo();
 			}
-			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			while ( tx_polling->poll != NULL ) {
 				Fl::awake();
-				if (xmlrpc_pending ||
-					!(PTT ||
+				if (	!(PTT ||
 					  (cwio_process == SEND) ||
 					  (cwio_process == CALIBRATE) ||
 					  (cwio_process == KEYDOWN) )) break;
 				if (*tx_polling->poll)  {
+					MilliSleep(10);
+					poll_interval -= 10;
 					guard_lock lk( &mutex_serial,
 						std::string(__func__).append(" ").append(tx_polling->name));
 					(tx_polling->pollfunc)();
-//					check_ptt();
-				} else
-					MilliSleep(10);
+				}
 				++tx_polling;
 			}
 			if (tx_polling->poll == NULL)
 				tx_polling = &TX_poll_pairs[0];
-			if (xmlrpc_pending) goto serial_bypass_loop;
-
 		} else {
 
 			if (!isRX) {
@@ -1893,51 +1892,48 @@ extern bool xmlrpc_pending;
 
 			while ( (rx_poll_group_1->poll != NULL) ) {
 				Fl::awake();
-				if (xmlrpc_pending || PTT) break;
+				if ( PTT ) break;
 				if (*rx_poll_group_1->poll) {
+					MilliSleep(10);
+					poll_interval -= 10;
 					guard_lock lk( &mutex_serial,
 						std::string(__func__).append(" ").append(rx_poll_group_1->name));
 					(rx_poll_group_1->pollfunc)();
-//					check_ptt();
-				} else
-					MilliSleep(10);
+				}
 				++rx_poll_group_1;
 			}
 			if ((rx_poll_group_1)->poll == NULL)
 				rx_poll_group_1 = &RX_poll_group_1[0];
-			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			while ( (rx_poll_group_2->poll != NULL) ) {
 				Fl::awake();
-				if (xmlrpc_pending || PTT) break;
+				if ( PTT ) break;
 				if (*rx_poll_group_2->poll) {
+					MilliSleep(10);
+					poll_interval -= 10;
 					guard_lock lk( &mutex_serial,
 						std::string(__func__).append(" ").append(rx_poll_group_2->name));
 					(rx_poll_group_2->pollfunc)();
-//					check_ptt();
-				} else
-					MilliSleep(10);
+				}
 				++rx_poll_group_2;
 			}
 			if ((rx_poll_group_2)->poll == NULL)
 				rx_poll_group_2 = &RX_poll_group_2[0];
-			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			while ( (rx_poll_group_3->poll != NULL) ) {
 				Fl::awake();
-				if (xmlrpc_pending || PTT) break;
+				if ( PTT ) break;
 				if (*rx_poll_group_3->poll) {
+					MilliSleep(10);
+					poll_interval -= 10;
 					guard_lock lk( &mutex_serial,
 						std::string(__func__).append(" ").append(rx_poll_group_3->name));
 					(rx_poll_group_3->pollfunc)();
-//					check_ptt();
-				} else
-					MilliSleep(10);
+				}
 				++rx_poll_group_3;
 			}
 			if ((rx_poll_group_3)->poll == NULL)
 				rx_poll_group_3 = &RX_poll_group_3[0];
-			if (xmlrpc_pending) goto serial_bypass_loop;
 
 			if (menu1 < 9  && selrig->name_ == rig_QCXP.name_) {
 				guard_lock lk( &mutex_serial,
@@ -1946,7 +1942,13 @@ extern bool xmlrpc_pending;
 			}
 
 		}
+
 serial_bypass_loop: ;
+
+		if (poll_interval < 10) poll_interval = 10;
+		MilliSleep(poll_interval);
+
+		poll_interval = progStatus.serloop_timing;
 	}
 	return NULL;
 

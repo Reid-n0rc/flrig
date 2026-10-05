@@ -43,7 +43,7 @@ guard_lock::guard_lock(pthread_mutex_t* m, std::string h, long tout) : mutex(m) 
 	how = h;
 	time_out = tout;
 	start_time = zmsec();
-	for (int i = 0; i < 20; i++) {
+	for (int i = 0; i < 1000; i++) {
 		if (pthread_mutex_trylock(mutex) == 0) {
 			std::string szlock = name(mutex);
 			szlock.append(" try lock ");
@@ -54,7 +54,7 @@ guard_lock::guard_lock(pthread_mutex_t* m, std::string h, long tout) : mutex(m) 
 			lock_trace(1, szlock.c_str());
 			return;
 		}
-		MilliSleep(50);
+		MilliSleep(1);
 	}
 
 	std::string szlock;;
