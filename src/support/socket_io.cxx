@@ -238,7 +238,7 @@ void send_to_remote(std::string cmd_string)
 	try {
 		tcpip->send(cmd_string);
 
-		LOG_WARN("send to remote: %s", cmd_string.c_str());
+		LOG_DEBUG("send to remote: %s", cmd_string.c_str());
 
 		drop_count = 0;
 	} catch (const SocketException& e) {
@@ -260,10 +260,8 @@ int read_from_remote(std::string &str)
 		str = rxbuffer;
 		rxbuffer.clear();
 	}
-	char szc[200];
-	snprintf(szc, sizeof(szc), "read_from_remote() : %s", str.c_str());
-
-	LOG_WARN("%s", szc);
+	if (!str.empty())
+		LOG_DEBUG("read_from_remote() : %s", str.c_str());
 
 	return (int)str.length();
 }
