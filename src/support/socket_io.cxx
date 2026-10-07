@@ -244,6 +244,20 @@ void send_to_remote(std::string cmd_string)
 		}
 	}
 
+// discard old input, as FlushBuffer() does for a serial port: a reply
+// that came after its command timed out would be read by the next one
+	{
+		guard_lock socket_lock(&mutex_rcv_socket);
+		try {
+			tcpip->recv(rxbuffer);
+		} catch (const SocketException& e) {
+			LOG_ERROR("Error %d, %s", e.error(), e.what());
+		}
+		if (!rxbuffer.empty())
+			LOG_DEBUG("discarded: %s", rxbuffer.c_str());
+		rxbuffer.clear();
+	}
+
 	try {
 		tcpip->send(cmd_string);
 
