@@ -193,6 +193,18 @@ void disconnect_from_remote()
 {
 	if (!tcpip || tcpip->fd() == -1) return;
 
+// stop the receive thread before deleting the socket it reads
+	if (rcv_socket_thread) {
+		{
+			guard_lock socket_lock(&mutex_rcv_socket);
+			exit_socket_loop = true;
+		}
+		pthread_join(*rcv_socket_thread, NULL);
+		delete rcv_socket_thread;
+		rcv_socket_thread = NULL;
+		LOG_QUIET("%s", "Exited from socket read thread");
+	}
+
 	tcpip->close();
 	delete tcpip;
 	tcpip = 0;
@@ -200,11 +212,6 @@ void disconnect_from_remote()
 	delete remote_addr;
 	remote_addr = 0;
 	LOG_QUIET("%s", "Deleted socket address instance");
-	exit_socket_loop = true;
-
-	pthread_join(*rcv_socket_thread, NULL);
-	rcv_socket_thread = NULL;
-	LOG_QUIET("%s", "Exited from socket read thread");
 
 	box_tcpip_connect->color(FL_LIGHT1);
 	box_tcpip_connect->redraw();

@@ -4232,8 +4232,10 @@ void TRACED(close_UI)
 	if (selrig->has_xcvr_auto_on_off && progStatus.xcvr_auto_off)
 		selrig->set_xcvr_auto_off();
 
-	// close down the serial port
+	// close down the serial port, or the TCP/IP connection
 	RigSerial->ClosePort();
+	if (progStatus.use_tcpip)
+		disconnect_from_remote();
 
 	debug::stop();
 
