@@ -177,6 +177,8 @@ int readResponse(std::string req1, std::string req2)
 		else
 			numread = RigSerial->ReadBuffer(respstr, RXBUFFSIZE, req1, req2);
 
+// without a terminator there is nothing to wait for; read once
+		if (req1.empty() && req2.empty()) break;
 		if (!req1.empty() && respstr.find(req1) != std::string::npos) break;
 		if (!req2.empty() && respstr.find(req2) != std::string::npos) break;
 
