@@ -4211,14 +4211,22 @@ void TRACED(exit_commands)
 	if (!progStatus.cmd_on_exit4.empty()) send_st_ex_command(progStatus.cmd_on_exit4);
 }
 
-void TRACED(close_UI)
-
+// stop the polling thread; safe to call more than once
+void stop_serial_thread()
+{
+	if (!run_serial_thread) return;
 	{
 		guard_lock serial_lock( &mutex_serial, std::string(__func__) );
-		trace(1, "close_UI()");
+		trace(1, "stop_serial_thread()");
 		run_serial_thread = false;
 	}
 	pthread_join(*serial_thread, NULL);
+}
+
+void TRACED(close_UI)
+
+	trace(1, "close_UI()");
+	stop_serial_thread();
 
 // xcvr auto off
 	if (selrig->has_xcvr_auto_on_off && progStatus.xcvr_auto_off)
@@ -4284,6 +4292,9 @@ void TRACED(cbExit)
 	progress->position(grpInitializing->w()/4, grpInitializing->y() + grpInitializing->h()/2);
 
 	update_progress(0);
+
+// no polls during the restore, and the saved state stays as read here
+	stop_serial_thread();
 
 	progStatus.freq_A = vfoA.freq;
 	progStatus.imode_A = vfoA.imode;

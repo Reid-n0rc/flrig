@@ -239,6 +239,7 @@ extern void cb_tt550_setXmtBW();
 extern void cb_tt550_cw_qsk();
 
 extern void closeRig();
+extern void stop_serial_thread();
 extern void cbExit();
 
 extern void about();
