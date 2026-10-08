@@ -167,16 +167,22 @@ std::string respstr;
 int readResponse(std::string req1, std::string req2)
 {
 	int numread = 0;
+	std::string piece;
 
 	respstr.clear();
 
 	int loop = 100;
 	do {
+// each read returns only the new characters; keep them all
 		if (progStatus.use_tcpip)
-			numread = read_from_remote(respstr);
+			read_from_remote(piece);
 		else
-			numread = RigSerial->ReadBuffer(respstr, RXBUFFSIZE, req1, req2);
+			RigSerial->ReadBuffer(piece, RXBUFFSIZE, req1, req2);
+		respstr.append(piece);
+		numread = respstr.length();
 
+// without a terminator there is nothing to wait for; read once
+		if (req1.empty() && req2.empty()) break;
 		if (!req1.empty() && respstr.find(req1) != std::string::npos) break;
 		if (!req2.empty() && respstr.find(req2) != std::string::npos) break;
 
