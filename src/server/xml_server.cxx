@@ -600,6 +600,9 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_notch");
 
 		static int ntch;
 		ntch = (int)(params[0]);
@@ -608,8 +611,6 @@ public:
 			progStatus.notch = true;
 		else
 			progStatus.notch = false;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_notch");
 
 		selrig->set_notch(progStatus.notch, progStatus.notch_val);
 		xml_trace(1, "rig_set_notch");
@@ -631,6 +632,9 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_notch");
 
 		static int ntch;
 		ntch = (int)(params[0]);
@@ -639,8 +643,6 @@ public:
 			progStatus.notch = true;
 		else
 			progStatus.notch = false;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_notch");
 
 		selrig->set_notch(progStatus.notch, progStatus.notch_val);
 		xml_trace(1, "rig_set_verify_notch");
@@ -694,12 +696,13 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_rfgain");
 
 		static int rfg;
 		rfg = static_cast<int>((double)((params[0])));
 		progStatus.rfgain = rfg;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_rfgain");
 
 		selrig->set_rf_gain(progStatus.rfgain);
 		xml_trace(1, "rig_set_rfgain");
@@ -721,12 +724,13 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set _verify_rfgain");
 
 		static int rfg;
 		rfg = static_cast<int>((double)((params[0])));
 		progStatus.rfgain = rfg;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set _verify_rfgain");
 
 		selrig->set_rf_gain(progStatus.rfgain);
 
@@ -751,6 +755,9 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_mod_rfgain");
 
 		int min, max, step;
 		selrig->get_rf_min_max_step(min, max, step);
@@ -759,8 +766,6 @@ public:
 		progStatus.rfgain += change;
 		if (progStatus.rfgain > max) progStatus.rfgain = max;
 		if (progStatus.rfgain < min) progStatus.rfgain = min;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_mod_rfgain");
 
 		selrig->set_rf_gain(progStatus.rfgain);
 		xml_trace(1, "rig_mod_rfgain");
@@ -814,12 +819,13 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_micgain");
 
 		static int micg;
 		micg = (int)(params[0]);
 		progStatus.mic_gain = micg;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_micgain");
 
 		xml_trace(1, "rig_set_micgain");
 		selrig->set_mic_gain(progStatus.mic_gain);
@@ -841,12 +847,13 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_micgain");
 
 		static int micg;
 		micg = (int)(params[0]);
 		progStatus.mic_gain = micg;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_micgain");
 
 		xml_trace(1, "rig_set_verify_micgain");
 		selrig->set_mic_gain(progStatus.mic_gain);
@@ -903,12 +910,13 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_volume");
 
 		static int volume;
 		volume = (int)(params[0]);
 		progStatus.volume = volume;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_volume");
 
 		selrig->set_volume_control(progStatus.volume);
 		xml_trace(1, "rig_set_volume");
@@ -930,12 +938,13 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_volume");
 
 		static int volume;
 		volume = (int)(params[0]);
 		progStatus.volume = volume;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_set_verify_volume");
 
 		selrig->set_volume_control(progStatus.volume);
 
@@ -960,6 +969,9 @@ public:
 			result = 0;
 			return;
 		}
+		// lock before progStatus is written: a poll of the same control
+		// while waiting for the lock would replace the requested value
+		guard_lock serial_lock(&mutex_serial, "xml rig_mod_volume");
 		int min, max, step;
 		selrig->get_vol_min_max_step(min, max, step);
 
@@ -967,8 +979,6 @@ public:
 		progStatus.volume += change;
 		if (progStatus.volume > max) progStatus.volume = max;
 		if (progStatus.volume < min) progStatus.volume = min;
-
-		guard_lock serial_lock(&mutex_serial, "xml rig_mod_volume");
 
 		selrig->set_volume_control(progStatus.volume);
 		xml_trace(1, "rig_mod_volume");
@@ -1859,14 +1869,18 @@ public:
 			return;
 		}
 
-		PTT = int(params[0]);
+		int val = int(params[0]);
 
 		std::stringstream s;
 		long start = zmsec();
 
-		s << ztime() << " rig.set_verify_ptt " << (PTT ? "ON " : "OFF ");
+		s << ztime() << " rig.set_verify_ptt " << (val ? "ON " : "OFF ");
 
 		guard_lock ser_lock (&mutex_serial, "xml set verify ptt");
+
+		// set PTT only with the lock held: the serial thread's poll sets
+		// it to the radio's state, which would replace the request
+		PTT = val;
 
 		rigPTT(PTT);
 		{
@@ -1880,10 +1894,13 @@ public:
 				++cnt;
 			}
 
-			if (cnt == 500) {
+			if (cnt == 100) {
 //std::cout << "PTT FAILURE!!" << std::endl;
-				exit(1)
-				;
+				// the radio did not follow within 1 sec; report the state
+				// it is in rather than the request
+				LOG_WARN("rig.set_verify_ptt %d: radio still reports %d",
+					val, get);
+				PTT = get;
 			}
 			s << " [ " << zmsec() - start << " msec ]";
 			xml_trace(1, s.str().c_str());
@@ -1919,8 +1936,9 @@ public:
 		{
 			guard_lock ser_lock (&mutex_serial, "xml set ptt");
 //std::cout << ztime() << " gl: " << zmsec() - start << std::endl;
+			const int tries = 20;
 			int n = 0;
-			for (n = 0; n < 20; n++) {
+			for (n = 0; n < tries; n++) {
 				rigPTT(val);
 //std::cout << ztime() << " st: " << zmsec() - start << std::endl; 
 //				MilliSleep(5);
@@ -1928,8 +1946,10 @@ public:
 //std::cout << ztime() << " rp: " << zmsec() - start << std::endl; 
 				MilliSleep(5);
 			}
-			if (n == 10) {
+			if (n == tries) {
 //std::cout << ztime() << " PTT FAILURE!!" << std::endl;
+				LOG_WARN("rig.set_ptt %d: radio did not follow in %d tries",
+					val, tries);
 			} else {
 //std::cout << ztime() << " rd: " << n + 1 << " [ " << zmsec() - start << " msec ]" << std::endl;
 //if (zmsec() - start >= 100)
@@ -1962,15 +1982,19 @@ public:
 
 		std::stringstream s;
 		long start = zmsec();
-		PTT = int(params[0]);
+		int val = int(params[0]);
 
 		s << ztime();
 		#ifdef HAS_XMLRPC_CLIENT_ID
 			s << " [" << XmlRpc::client_id << "]";
 		#endif
-		s << " rig.set_ptt_fast " << (PTT ? "ON " : "OFF ");
+		s << " rig.set_ptt_fast " << (val ? "ON " : "OFF ");
 
 		guard_lock ser_lock (&mutex_serial, "xml set ptt fast");
+
+		// set PTT only with the lock held: the serial thread's poll sets
+		// it to the radio's state, which would replace the request
+		PTT = val;
 
 		s << " @ " << ztime();
 
