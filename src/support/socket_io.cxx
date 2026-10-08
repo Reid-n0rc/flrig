@@ -27,6 +27,7 @@
 #include "compat.h" // Must precede all FL includes
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
@@ -77,6 +78,40 @@ static std::string rxbuffer;
 pthread_t *rcv_socket_thread = 0;
 pthread_mutex_t mutex_rcv_socket = PTHREAD_MUTEX_INITIALIZER;
 
+// The connection boxes are FLTK widgets: change them only on the main
+// thread.  The socket code runs on the receive, poll and xmlrpc threads,
+// so it posts the new colour with Fl::awake, and only when it changes.
+static pthread_mutex_t mutex_tcpip_state = PTHREAD_MUTEX_INITIALIZER;
+static int tcpip_state = -1;	// last colour posted, -1 = none
+
+static void update_tcpip_boxes(void *d)
+{
+	Fl_Color c = (Fl_Color)reinterpret_cast<intptr_t>(d);
+	if (c == FL_GREEN) tcpip_box->show();
+	box_tcpip_connect->color(c);
+	box_tcpip_connect->redraw();
+	box_xcvr_connect->color(c);
+	box_xcvr_connect->redraw();
+	tcpip_menu_box->color(c);
+	tcpip_menu_box->redraw();
+}
+
+static void show_tcpip_state(Fl_Color c)
+{
+	pthread_mutex_lock(&mutex_tcpip_state);
+	bool changed = (tcpip_state != (int)c);
+	tcpip_state = c;
+	pthread_mutex_unlock(&mutex_tcpip_state);
+	if (!changed) return;
+
+	if (Fl::awake(update_tcpip_boxes, reinterpret_cast<void *>((intptr_t)c)) != 0) {
+// awake queue full: forget the state so the next call posts again
+		pthread_mutex_lock(&mutex_tcpip_state);
+		tcpip_state = -1;
+		pthread_mutex_unlock(&mutex_tcpip_state);
+	}
+}
+
 void *rcv_socket_loop(void *)
 {
 	for (;;) {
@@ -87,20 +122,10 @@ void *rcv_socket_loop(void *)
 			if (tcpip && tcpip->fd() != -1) { 
 				try {
 					tcpip->recv(rxbuffer);
-					box_tcpip_connect->color(FL_GREEN);
-					box_tcpip_connect->redraw();
-					box_xcvr_connect->color(FL_GREEN);
-					box_xcvr_connect->redraw();
-					tcpip_menu_box->color(FL_GREEN);
-					tcpip_menu_box->redraw();
+					show_tcpip_state(FL_GREEN);
 				} catch (const SocketException& e) {
 					LOG_ERROR("Error %d, %s", e.error(), e.what());
-					box_tcpip_connect->color(FL_YELLOW);
-					box_tcpip_connect->redraw();
-					box_xcvr_connect->color(FL_YELLOW);
-					box_xcvr_connect->redraw();
-					tcpip_menu_box->color(FL_YELLOW);
-					tcpip_menu_box->redraw();
+					show_tcpip_state(FL_YELLOW);
 				}
 			}
 		} // end guard_lock
@@ -126,13 +151,7 @@ void connect_to_remote()
 			tcpip->connect();
 			tcpip->set_nonblocking(true);
 			LOG_QUIET("Connected to %d", tcpip->fd());
-			tcpip_box->show();
-			box_tcpip_connect->color(FL_GREEN);
-			box_tcpip_connect->redraw();
-			box_xcvr_connect->color(FL_GREEN);
-			box_xcvr_connect->redraw();
-			tcpip_menu_box->color(FL_GREEN);
-			tcpip_menu_box->redraw();
+			show_tcpip_state(FL_GREEN);
 		}
 		if (tcpip->fd() == -1) {
 
@@ -140,14 +159,7 @@ void connect_to_remote()
 				tcpip->connect(*remote_addr);
 				tcpip->set_nonblocking(true);
 				LOG_QUIET("Connected to %d", tcpip->fd());
-
-				tcpip_box->show();
-				box_tcpip_connect->color(FL_GREEN);
-				box_tcpip_connect->redraw();
-				box_xcvr_connect->color(FL_GREEN);
-				box_xcvr_connect->redraw();
-				tcpip_menu_box->color(FL_GREEN);
-				tcpip_menu_box->redraw();
+				show_tcpip_state(FL_GREEN);
 			} catch (const SocketException & e) {
 				LOG_ERROR("Error: %d, %s", e.error(), e.what());
 
@@ -155,12 +167,7 @@ void connect_to_remote()
 				remote_addr = 0;
 				delete tcpip;
 				tcpip = 0;
-				box_tcpip_connect->color(FL_LIGHT1);
-				box_tcpip_connect->redraw();
-				box_xcvr_connect->color(FL_LIGHT1);
-				box_xcvr_connect->redraw();
-				tcpip_menu_box->color(FL_LIGHT1);
-				tcpip_menu_box->redraw();
+				show_tcpip_state(FL_LIGHT1);
 				throw e;
 			}
 		}
@@ -193,6 +200,18 @@ void disconnect_from_remote()
 {
 	if (!tcpip || tcpip->fd() == -1) return;
 
+// stop the receive thread before deleting the socket it reads
+	if (rcv_socket_thread) {
+		{
+			guard_lock socket_lock(&mutex_rcv_socket);
+			exit_socket_loop = true;
+		}
+		pthread_join(*rcv_socket_thread, NULL);
+		delete rcv_socket_thread;
+		rcv_socket_thread = NULL;
+		LOG_QUIET("%s", "Exited from socket read thread");
+	}
+
 	tcpip->close();
 	delete tcpip;
 	tcpip = 0;
@@ -200,18 +219,8 @@ void disconnect_from_remote()
 	delete remote_addr;
 	remote_addr = 0;
 	LOG_QUIET("%s", "Deleted socket address instance");
-	exit_socket_loop = true;
 
-	pthread_join(*rcv_socket_thread, NULL);
-	rcv_socket_thread = NULL;
-	LOG_QUIET("%s", "Exited from socket read thread");
-
-	box_tcpip_connect->color(FL_LIGHT1);
-	box_tcpip_connect->redraw();
-	box_xcvr_connect->color(FL_LIGHT1);
-	box_xcvr_connect->redraw();
-	tcpip_menu_box->color(FL_LIGHT1);
-	tcpip_menu_box->redraw();
+	show_tcpip_state(FL_LIGHT1);
 }
 
 int retry_after = 0;
@@ -235,10 +244,24 @@ void send_to_remote(std::string cmd_string)
 		}
 	}
 
+// discard old input, as FlushBuffer() does for a serial port: a reply
+// that came after its command timed out would be read by the next one
+	{
+		guard_lock socket_lock(&mutex_rcv_socket);
+		try {
+			tcpip->recv(rxbuffer);
+		} catch (const SocketException& e) {
+			LOG_ERROR("Error %d, %s", e.error(), e.what());
+		}
+		if (!rxbuffer.empty())
+			LOG_DEBUG("discarded: %s", rxbuffer.c_str());
+		rxbuffer.clear();
+	}
+
 	try {
 		tcpip->send(cmd_string);
 
-		LOG_WARN("send to remote: %s", cmd_string.c_str());
+		LOG_DEBUG("send to remote: %s", cmd_string.c_str());
 
 		drop_count = 0;
 	} catch (const SocketException& e) {
@@ -260,10 +283,8 @@ int read_from_remote(std::string &str)
 		str = rxbuffer;
 		rxbuffer.clear();
 	}
-	char szc[200];
-	snprintf(szc, sizeof(szc), "read_from_remote() : %s", str.c_str());
-
-	LOG_WARN("%s", szc);
+	if (!str.empty())
+		LOG_DEBUG("read_from_remote() : %s", str.c_str());
 
 	return (int)str.length();
 }

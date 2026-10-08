@@ -109,10 +109,11 @@ void debug::start(const char* filename)
 
 void debug::stop(void)
 {
-//	guard_lock dlock(&debug_mutex);
+	pthread_mutex_lock(&debug_mutex);
 	delete inst;
 	inst = 0;
 	btext = 0;
+	pthread_mutex_unlock(&debug_mutex);
 	if (window) {
 		delete window;
 		window = 0;
@@ -125,8 +126,15 @@ static std::string estr = "";
 
 void debug::log(level_e level, const char* func, const char* srcf, int line, const char* format, ...)
 {
-	if (!inst) return;
 	if (level > debug::level) return;
+
+// fmt, sztemp and estr are shared by every thread that logs.
+// A plain mutex: guard_lock can itself log.
+	pthread_mutex_lock(&debug_mutex);
+	if (!inst) {
+		pthread_mutex_unlock(&debug_mutex);
+		return;
+	}
 
 	snprintf(fmt, sizeof(fmt), "%c: %s: %s\n", *prefix[level], func, format);
 
@@ -135,7 +143,6 @@ void debug::log(level_e level, const char* func, const char* srcf, int line, con
 
 	vsnprintf(sztemp, sizeof(sztemp), fmt, args);
 
-//	guard_lock dlock(&debug_mutex);
 	estr.append(sztemp);
 
 	if (progStatus.debugtrace) trace(1, sztemp);
@@ -146,13 +153,22 @@ void debug::log(level_e level, const char* func, const char* srcf, int line, con
 
 	fflush(wfile);
 
+	pthread_mutex_unlock(&debug_mutex);
+
 	Fl::awake(sync_text, 0);
 }
 
 void debug::slog(level_e level, const char* func, const char* srcf, int line, const char* format, ...)
 {
-	if (!inst) return;
 	if (level > debug::level) return;
+
+// fmt, sztemp and estr are shared by every thread that logs.
+// A plain mutex: guard_lock can itself log.
+	pthread_mutex_lock(&debug_mutex);
+	if (!inst) {
+		pthread_mutex_unlock(&debug_mutex);
+		return;
+	}
 
 	snprintf(fmt, sizeof(fmt), "%c:%s\n", *prefix[level], format);
 
@@ -161,7 +177,6 @@ void debug::slog(level_e level, const char* func, const char* srcf, int line, co
 
 	vsnprintf(sztemp, sizeof(sztemp), fmt, args);
 
-//	guard_lock dlock(&debug_mutex);
 	estr.append(sztemp);
 
 	if (progStatus.debugtrace) trace(1, sztemp);
@@ -172,7 +187,9 @@ void debug::slog(level_e level, const char* func, const char* srcf, int line, co
 
 	fflush(wfile);
 
-    Fl::awake(sync_text, 0);
+	pthread_mutex_unlock(&debug_mutex);
+
+	Fl::awake(sync_text, 0);
 }
 
 void debug::elog(const char* func, const char* srcf, int line, const char* text)
@@ -190,19 +207,22 @@ void debug::sync_text(void* arg)
 	if (!window) return;
 	if (!window->visible()) return;
 
-//	guard_lock dlock(&debug_mutex);
+	std::string text;
+	pthread_mutex_lock(&debug_mutex);
+	text.swap(estr);
+	pthread_mutex_unlock(&debug_mutex);
+
 	if (inst == 0 || btext == 0) return;
 
-	size_t p0 = 0, p1 = estr.find('\n');
+	size_t p0 = 0, p1 = text.find('\n');
 	std::string insrt;
 	while (p1 != std::string::npos) {
-		insrt = estr.substr(p0, p1-p0);
+		insrt = text.substr(p0, p1-p0);
 		btext->insert(1, insrt.c_str());
 		buffer.append(insrt.append("\n"));
 		p0 = p1 + 1;
-		p1 = estr.find('\n', p0);
+		p1 = text.find('\n', p0);
 	}
-	estr = "";
 }
 
 debug::debug(const char* filename)
