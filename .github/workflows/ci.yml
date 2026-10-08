@@ -1,0 +1,322 @@
+# flrig CI: build, unit tests and emulator tests on Linux, macOS and Windows.
+# No radio is used: the FT-710 and FTX-1 emulators in tests/emu stand in.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLTK_VERSION: 1.4.4
+  MXE_COMMIT: a9135e50775889ef9448cf12b72da0ea25aa04c1
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Packages (wiki debian_howto)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool \
+            pkg-config gettext cmake clang xvfb python3 \
+            libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
+            libxrender-dev libxfixes-dev libfontconfig1-dev libudev-dev \
+            libgl-dev libglu1-mesa-dev
+      - name: FLTK cache
+        id: fltk
+        uses: actions/cache@v4
+        with:
+          path: ~/fltk
+          key: fltk-${{ env.FLTK_VERSION }}-${{ matrix.os }}
+      - name: FLTK ${{ env.FLTK_VERSION }}
+        if: steps.fltk.outputs.cache-hit != 'true'
+        run: tests/ci/build_fltk.sh "$HOME/fltk"
+      - name: Build flrig (wiki sf_clone_howto)
+        run: |
+          autoreconf -i
+          ./configure FLTK_CONFIG=$HOME/fltk/bin/fltk-config
+          make -j4 2>&1 | tee make.log
+          echo "warnings: $(grep -c 'warning:' make.log)"
+          test -x src/flrig
+      - name: C++11 check (as the Windows MXE build)
+        run: |
+          for f in src/rigs/yaesu/FT710.cxx src/rigs/yaesu/FTX_1.cxx \
+                   src/rigs/yaesu/FT891.cxx src/support/rig_io.cxx \
+                   src/support/socket_io.cxx src/support/debug.cxx \
+                   src/support/threads.cxx src/server/xml_server.cxx; do
+            g++ -std=c++11 -fsyntax-only -w -Isrc -Isrc/include \
+              -Isrc/xmlrpcpp -I. $($HOME/fltk/bin/fltk-config --cxxflags) \
+              -DHAVE_CONFIG_H "$f" || exit 1
+          done
+      - name: Unit tests
+        run: FLTK_CONFIG=$HOME/fltk/bin/fltk-config tests/unit/run_unit.sh
+      - name: Emulator tests (FT-710, FTX-1; serial and TCP/IP)
+        run: xvfb-run -a python3 tests/emu/ci_emu.py src/flrig
+      - name: Install test (make install, flrig --version)
+        run: |
+          make install DESTDIR=$PWD/stage > /dev/null
+          xvfb-run -a stage/usr/local/bin/flrig --version
+      - name: Source release builds (make dist, configure, make)
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          make dist > /dev/null
+          mkdir dist-test && tar xzf flrig-*.tar.gz -C dist-test
+          cd dist-test/flrig-*
+          ./configure FLTK_CONFIG=$HOME/fltk/bin/fltk-config > /dev/null
+          make -j4 > /dev/null && test -x src/flrig
+      - name: Unit tests on the base branch (expected to fail where a fix is new)
+        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-24.04'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mkdir -p base
+          git archive "$BASE_SHA" src | tar -x -C base
+          FLTK_CONFIG=$HOME/fltk/bin/fltk-config tests/unit/run_unit.sh \
+            -r base -o tests/unit/out-base > base.log 2>&1 || true
+          {
+            echo "### Unit tests on the base branch"
+            echo "A FAIL here and a PASS on this PR means the PR fixes it."
+            echo '```'
+            sed -n '/== summary/,$p' base.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-${{ matrix.os }}
+          path: |
+            make.log
+            config.log
+            tests/unit/out*/
+            tests/emu/runs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  coverage:
+    name: Coverage (Codecov)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool \
+            pkg-config gettext cmake xvfb python3 python3-pip \
+            libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
+            libxrender-dev libxfixes-dev libfontconfig1-dev libudev-dev \
+            libgl-dev libglu1-mesa-dev
+          pipx install gcovr
+      - name: FLTK cache
+        id: fltk
+        uses: actions/cache@v4
+        with:
+          path: ~/fltk
+          key: fltk-${{ env.FLTK_VERSION }}-ubuntu-24.04
+      - name: FLTK ${{ env.FLTK_VERSION }}
+        if: steps.fltk.outputs.cache-hit != 'true'
+        run: tests/ci/build_fltk.sh "$HOME/fltk"
+      - name: Build flrig with coverage
+        run: |
+          autoreconf -i
+          ./configure FLTK_CONFIG=$HOME/fltk/bin/fltk-config \
+            CXXFLAGS="-O0 -g --coverage" LDFLAGS="--coverage"
+          make -j4 > make.log 2>&1 || { tail -40 make.log; exit 1; }
+      - name: Unit tests with coverage
+        run: |
+          CXX=g++ EXTRA_CXXFLAGS="-O0 --coverage" REPS=1 \
+            FLTK_CONFIG=$HOME/fltk/bin/fltk-config \
+            tests/unit/run_unit.sh rig_io socket_io debug_log
+      - name: Emulator tests with coverage
+        run: xvfb-run -a python3 tests/emu/ci_emu.py src/flrig
+      - name: Coverage report
+        if: always()
+        run: |
+          gcovr --root . --filter src/ --xml coverage.xml \
+            --gcov-ignore-errors=all --gcov-ignore-parse-errors=all \
+            --print-summary . tests/unit/out
+      - uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: false
+
+  macos:
+    name: macOS ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages
+        run: brew install autoconf automake libtool pkg-config gettext
+      - name: FLTK cache
+        id: fltk
+        uses: actions/cache@v4
+        with:
+          path: ~/fltk
+          key: fltk-${{ env.FLTK_VERSION }}-${{ matrix.os }}
+      - name: FLTK ${{ env.FLTK_VERSION }}
+        if: steps.fltk.outputs.cache-hit != 'true'
+        run: tests/ci/build_fltk.sh "$HOME/fltk"
+      - name: Build flrig
+        run: |
+          autoreconf -i
+          ./configure FLTK_CONFIG=$HOME/fltk/bin/fltk-config
+          make -j4 2>&1 | tee make.log
+          echo "warnings: $(grep -c 'warning:' make.log)"
+          test -x src/flrig
+      - name: Unit tests
+        run: FLTK_CONFIG=$HOME/fltk/bin/fltk-config tests/unit/run_unit.sh
+      - name: Emulator tests (FT-710, FTX-1; serial and TCP/IP)
+        run: python3 tests/emu/ci_emu.py src/flrig
+      - name: App bundle and .dmg (make appbundle)
+        run: |
+          make appbundle > appbundle.log 2>&1 || { tail -30 appbundle.log; exit 1; }
+          # sign ad hoc and rebuild the dmg, as the release packages are made
+          APP=$(ls -d src/flrig-*/flrig-*.app)
+          codesign --force --deep -s - "$APP"
+          codesign --verify --deep --strict "$APP"
+          DMG=$(ls src/flrig-*.dmg)
+          hdiutil create -ov -srcfolder "$(dirname "$APP")" -format UDZO "$DMG" > /dev/null
+          ls -la "$DMG"
+          hdiutil attach -nobrowse -mountpoint /tmp/flrig-dmg "$DMG"
+          "$(ls -d /tmp/flrig-dmg/*.app)/Contents/MacOS/flrig" --version
+          hdiutil detach /tmp/flrig-dmg
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-${{ matrix.os }}
+          path: |
+            make.log
+            config.log
+            appbundle.log
+            tests/unit/out*/
+            tests/emu/runs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-build:
+    name: Windows build (MXE, as the website installer)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages for MXE
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake autopoint bash bison \
+            bzip2 flex g++ g++-multilib gettext git gperf intltool \
+            libc6-dev-i386 libgdk-pixbuf2.0-dev libltdl-dev libgl-dev \
+            libpcre3-dev libssl-dev libtool-bin libxml-parser-perl lzip make \
+            openssl p7zip-full patch perl python3 python3-mako ruby sed \
+            unzip wget xz-utils nsis pkg-config
+      - name: MXE cache
+        id: mxe
+        uses: actions/cache@v4
+        with:
+          path: ~/mxe
+          key: mxe-${{ env.MXE_COMMIT }}-i686-flrig-1
+      - name: MXE (fldigi setupmxe.sh packages; first run takes about an hour)
+        if: steps.mxe.outputs.cache-hit != 'true'
+        run: tests/ci/build_mxe.sh "$HOME/mxe" "$MXE_COMMIT"
+      - name: Build flrig.exe and the installer (scripts/buildmxe.sh)
+        run: |
+          export PREFIX=$HOME/mxe/usr PATH=$HOME/mxe/usr/bin:$PATH
+          autoreconf -i
+          sed -i 's/make -j 12/make -j 4/' scripts/buildmxe.sh
+          sh scripts/buildmxe.sh 2>&1 | tee buildmxe.log
+          echo "warnings: $(grep -c 'warning:' buildmxe.log)"
+          mkdir -p win && cp src/flrig.exe *setup*.exe win/
+          ls -la win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flrig-windows
+          path: win/
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-windows-build
+          path: |
+            buildmxe.log
+            config.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-test:
+    name: Windows test ${{ matrix.os }}
+    needs: windows-build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: flrig-windows
+          path: win
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (setup.exe /S)
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem win\*setup*.exe | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem -Recurse -Filter flrig.exe "${env:ProgramFiles(x86)}","$env:ProgramFiles" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "flrig.exe not installed" }
+          Write-Host "installed: $($exe.FullName) $($exe.VersionInfo.FileVersion)"
+          "FLRIG_EXE=$($exe.FullName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      # flrig --version shows a dialog on Windows, so the installed copy is
+      # tested by running it against the emulators instead.
+      - name: Emulator tests, installed flrig.exe (FT-710, FTX-1 over TCP/IP)
+        run: python tests/emu/ci_emu.py "$env:FLRIG_EXE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-${{ matrix.os }}
+          path: tests/emu/runs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-unit:
+    name: Windows unit tests (MSYS2 MinGW)
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-fltk mingw-w64-x86_64-cmake
+            make
+      - name: Unit tests
+        run: FLTK_CONFIG=fltk-config CXX=g++ tests/unit/run_unit.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-windows-unit
+          path: tests/unit/out/
+          if-no-files-found: ignore
+          retention-days: 14
